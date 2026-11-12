@@ -80,6 +80,33 @@
       "status": "review_required",
       "task": "log_analysis",
       "note": "Repository includes multiple corpora; verify individual dataset rights and provenance"
+    },
+    {
+      "id": "infra_ops",
+      "repo": "quantranger/infra-ops-incidents",
+      "license": "mit",
+      "status": "review_required",
+      "adapter": "infra_ops",
+      "task": "synthetic_incident_tool_trajectory",
+      "note": "Synthetic templated SRE trajectories; viewer generation error observed; inspect raw JSONL, provenance and schemas; keep synthetic split separate."
+    },
+    {
+      "id": "incident_management_events",
+      "repo": "processminingdata/incidentmanagement",
+      "license": "mit_repository_license_data_scope_unverified",
+      "status": "review_required",
+      "adapter": "incident_management_events",
+      "task": "incident_lifecycle_process_mining",
+      "note": "31k+ tickets and 242k+ events per repository description; inspect bundled archive and confirm data is covered by license."
+    },
+    {
+      "id": "planning2interaction",
+      "repo": "anonymous-p2i/Planning2Interaction",
+      "license": "verify_dataset_card",
+      "status": "review_required",
+      "adapter": "planning2interaction",
+      "task": "tool_recovery_trajectories",
+      "note": "General multi-turn function-call recovery data; not IT-specific; verify license and schema."
     }
   ]
 }
