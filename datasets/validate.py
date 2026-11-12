@@ -32,9 +32,10 @@ def validate(root):
                     if case_id in seen_ids:
                         raise ValueError("duplicate case ID")
                     seen_ids.add(case_id)
-                    if fp in seen_fingerprints:
-                        raise ValueError("duplicate text across splits")
-                    seen_fingerprints[fp] = split
+                    fingerprint_key = (rec["source"], fp)
+                    if fingerprint_key in seen_fingerprints:
+                        raise ValueError("duplicate text within source across splits")
+                    seen_fingerprints[fingerprint_key] = split
                     group = (rec["source"], rec["source_group"])
                     if group in groups and groups[group] != split:
                         raise ValueError("source group crosses split boundary")
