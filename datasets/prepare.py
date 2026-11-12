@@ -34,14 +34,14 @@ def normalize(source, row, features, upstream, index):
         if isinstance(label, int) and hasattr(features["label"], "int2str"):
             label = features["label"].int2str(label)
         task, labels = "classification", {"category": str(label)}
-        group = str(index)
+        group = digest(text)
     elif source == "helpdesk":
         expected = {"issue_id", "text", "issue_priority"}
         if not expected.issubset(row):
             raise ValueError("Unexpected helpdesk source schema")
         text = row["text"]
         task, labels = "priority_label", {"priority_source": str(row["issue_priority"])}
-        group = str(row["issue_id"])
+        group = upstream + ":" + str(row["issue_id"])
     elif source == "bitext":
         expected = {"instruction", "response"}
         if not expected.issubset(row):
@@ -99,7 +99,7 @@ def main():
                 if rec is None:
                     counts["invalid"] += 1
                     continue
-                key = rec["fingerprint"]
+                key = (src["id"], rec["fingerprint"])
                 if key in seen:
                     counts["duplicates"] += 1
                     continue
