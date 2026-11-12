@@ -35,6 +35,7 @@ def f1_from_counts(tp, fp, fn):
 
 def evaluate(gold_rows, prediction_rows):
     gold_by_id = {}
+    gold_splits = set()
     for row in gold_rows:
         case_id = row.get("case_id")
         if not case_id or case_id in gold_by_id:
@@ -48,7 +49,14 @@ def evaluate(gold_rows, prediction_rows):
             raise ValueError(f"Approved gold case {case_id} lacks reviewer metadata")
         if not row.get("gold", {}).get("labels"):
             raise ValueError(f"Approved gold case {case_id} has no gold labels")
+        source_split = row.get("provenance", {}).get("source_split")
+        if source_split not in {"validation", "test"}:
+            raise ValueError(f"Gold case {case_id} has invalid source split")
+        gold_splits.add(source_split)
         gold_by_id[case_id] = row
+
+    if len(gold_splits) > 1:
+        raise ValueError("Do not mix dev/validation and final test cases in one evaluation run")
 
     pred_by_id = {}
     for row in prediction_rows:
@@ -94,9 +102,12 @@ def evaluate(gold_rows, prediction_rows):
 
         expected_answerable = gold_row["gold"].get("answerable")
         predicted_answerable = pred.get("answerable")
-        if isinstance(expected_answerable, bool) and isinstance(predicted_answerable, bool):
+        if isinstance(expected_answerable, bool):
             answerability["cases"] += 1
-            answerability["correct"] += int(expected_answerable == predicted_answerable)
+            answerability["correct"] += int(
+                isinstance(predicted_answerable, bool)
+                and expected_answerable == predicted_answerable
+            )
             if expected_answerable is False and predicted_answerable is True:
                 answerability["false_confident_answers"] += 1
 
@@ -169,9 +180,14 @@ def evaluate(gold_rows, prediction_rows):
             ),
             "false_confident_answers": answerability["false_confident_answers"]
         },
+        "source_split": next(iter(gold_splits)) if gold_splits else None,
         "tool_use": {
             "cases_with_expected_tools": tool_totals["cases"],
-            **f1_from_counts(tool_totals["tp"], tool_totals["fp"], tool_totals["fn"])
+            **(
+                f1_from_counts(tool_totals["tp"], tool_totals["fp"], tool_totals["fn"])
+                if tool_totals["cases"] else
+                {"precision": None, "recall": None, "f1": None}
+            )
         },
         "required_fact_checks": {
             "cases": cases_with_required,
