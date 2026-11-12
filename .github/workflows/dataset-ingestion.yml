@@ -55,11 +55,11 @@ jobs:
       - name: Validate cleaned records
         run: python datasets/validate.py --input datasets/cleaned
 
-      - name: Generate consolidated quality report
-        run: python datasets/quality_report.py
-
       - name: Detect near-duplicate tickets for human review
         run: python datasets/quality/near_duplicates.py
+
+      - name: Generate consolidated quality report
+        run: python datasets/quality_report.py
 
       - name: Generate stratified evaluation review queue
         run: python datasets/evaluation/sample_eval.py --size 150 --seed 20261112
