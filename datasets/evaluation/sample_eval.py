@@ -177,7 +177,7 @@ def run(input_dir, output_path, manifest_path, size=150, seed=20261112, split="t
         "requested_size": size,
         "actual_size": len(cases),
         "seed": seed,
-        "eligible_test_records": len(eligible),
+        "eligible_records": len(eligible),
         "excluded_conflicting_exact_text_records": excluded_conflicts,
         "by_task": dict(by_task),
         "by_stratum": dict(by_stratum),
