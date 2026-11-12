@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/johnroselearning/Product-support-data/blob/main/datasets/evaluation/eval_case.schema.json",
+  "title": "Technical Support Agent Evaluation Case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "task", "input", "gold", "tags", "provenance", "review"],
+  "properties": {
+    "case_id": {"type": "string", "minLength": 1},
+    "task": {"type": "string", "minLength": 1},
+    "input": {
+      "type": "object",
+      "required": ["ticket", "context"],
+      "properties": {
+        "ticket": {"type": "string"},
+        "context": {"type": ["object", "array", "string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "gold": {
+      "type": "object",
+      "required": ["labels", "root_cause", "resolution", "must_include", "must_not", "expected_tools", "answerable"],
+      "properties": {
+        "labels": {"type": "object"},
+        "root_cause": {"type": ["string", "null"]},
+        "resolution": {"type": ["string", "null"]},
+        "must_include": {"type": "array", "items": {"type": "string"}},
+        "must_not": {"type": "array", "items": {"type": "string"}},
+        "expected_tools": {"type": "array", "items": {"type": "string"}},
+        "answerable": {"type": ["boolean", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "provenance": {
+      "type": "object",
+      "required": ["source", "source_case_id", "source_revision", "license", "source_split"],
+      "properties": {
+        "source": {"type": "string"},
+        "source_case_id": {"type": "string"},
+        "source_revision": {"type": "string"},
+        "license": {"type": "string"},
+        "source_split": {"const": "test"}
+      },
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "properties": {
+        "method": {"type": "string"},
+        "stratum": {"type": "string"},
+        "seed": {"type": "integer"}
+      },
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "required": ["status", "reviewer", "reviewed_at", "notes"],
+      "properties": {
+        "status": {"enum": ["pending", "approved", "rejected"]},
+        "reviewer": {"type": ["string", "null"]},
+        "reviewed_at": {"type": ["string", "null"]},
+        "notes": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  }
+}
