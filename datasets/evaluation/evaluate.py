@@ -8,7 +8,10 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from validation import load_validator, require_valid_case
+try:
+    from .validation import load_validator, require_valid_case
+except ImportError:  # Support direct execution: python datasets/evaluation/evaluate.py
+    from validation import load_validator, require_valid_case
 
 
 def read_jsonl(path):
