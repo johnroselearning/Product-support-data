@@ -1,4 +1,4 @@
-"""Conservative support-data preparation; Python 3.10+."""
+"""Normalize permitted public support datasets into provenance-rich JSONL."""
 import argparse
 import hashlib
 import json
@@ -7,7 +7,7 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SYSTEM = "You are a technical support engineer. Do not invent evidence or verified root causes."
+SYSTEM = "You are a technical support engineer. Never invent evidence or verified root causes."
 PATTERNS = {
     "email": re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b"),
     "phone": re.compile(r"(?<!\d)(?:\+?\d[\s().-]?){10,15}(?!\d)"),
@@ -27,42 +27,72 @@ def write(path, rows):
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 def normalize(source, row, features, upstream, index):
     if source == "it_support":
-        text = row.get("text")
-        label = row.get("label")
+        if set(row) != {"text", "label"}:
+            raise ValueError("Unexpected IT support source schema")
+        text = row["text"]
+        label = row["label"]
         if isinstance(label, int) and hasattr(features["label"], "int2str"):
             label = features["label"].int2str(label)
-        task = "classification"
-        answer = json.dumps({"category": str(label)})
+        task, labels = "classification", {"category": str(label)}
+        group = str(index)
+    elif source == "helpdesk":
+        expected = {"issue_id", "text", "issue_priority"}
+        if not expected.issubset(row):
+            raise ValueError("Unexpected helpdesk source schema")
+        text = row["text"]
+        task, labels = "priority_label", {"priority_source": str(row["issue_priority"])}
+        group = str(row["issue_id"])
+    elif source == "bitext":
+        expected = {"instruction", "response"}
+        if not expected.issubset(row):
+            raise ValueError("Unexpected Bitext source schema")
+        text = row["instruction"]
+        task, labels = "response", {"reference_response": row["response"]}
+        group = digest(text)
     else:
-        text = row.get("instruction")
-        task = "response"
-        answer = row.get("response")
-    if not isinstance(text, str) or not text.strip() or not isinstance(answer, str) or not answer.strip():
+        raise ValueError("Unsupported adapter: " + source)
+    if not isinstance(text, str) or not text.strip() or any(not isinstance(v, str) or not v.strip() for v in labels.values()):
         return None
     key = digest(text)
     return {
-        "case_id": source + "-" + key[:16],
+        "schema_version": "1.1", "case_id": source + "-" + key[:16],
         "source": source, "upstream_split": upstream, "upstream_row": index,
-        "task": task, "ticket": {"description": text},
-        "label_or_answer": answer,
-        "evidence": [], "actions": [], "root_cause": "unknown",
-        "resolution": "unknown", "quality": "unreviewed",
+        "source_group": group, "task": task, "ticket": {"description": text},
+        "labels": labels, "evidence": [], "actions": [], "root_cause": "unknown",
+        "resolution": "unknown", "quality": {"status": "unreviewed"},
         "fingerprint": key,
     }
+def to_sft(rec):
+    text, labels = rec["ticket"]["description"], rec["labels"]
+    if rec["task"] == "classification":
+        user = "Classify this support ticket. Return JSON with category only:\n" + text
+        answer = json.dumps({"category": labels["category"]}, ensure_ascii=False)
+    elif rec["task"] == "priority_label":
+        user = "Return the original ticket priority label as JSON with priority_source only:\n" + text
+        answer = json.dumps({"priority_source": labels["priority_source"]}, ensure_ascii=False)
+    else:
+        user, answer = text, labels["reference_response"]
+    return {"case_id": rec["case_id"], "source": rec["source"],
+            "messages": [{"role": "system", "content": SYSTEM},
+                         {"role": "user", "content": user},
+                         {"role": "assistant", "content": answer}]}
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--include-bitext", action="store_true")
+    p.add_argument("--include-bitext", action="store_true", help="Requires independent license review")
     p.add_argument("--output", type=Path, default=ROOT / "generated")
     args = p.parse_args()
     from datasets import load_dataset
     sources = json.loads((ROOT / "sources.json").read_text())["sources"]
     master = {s: [] for s in ("train", "validation", "test")}
     sft = {s: [] for s in master}
-    seen, counts = set(), Counter()
+    quarantine, seen, counts = [], set(), Counter()
     for src in sources:
         if src["status"] != "enabled" and not (args.include_bitext and src["id"] == "bitext"):
             continue
-        dataset = load_dataset(src["repo"])
+        kwargs = {"path": src["repo"]}
+        if src.get("config"):
+            kwargs["name"] = src["config"]
+        dataset = load_dataset(**kwargs)
         for upstream, rows in dataset.items():
             for i, row in enumerate(rows):
                 rec = normalize(src["id"], row, rows.features, upstream, i)
@@ -74,33 +104,32 @@ def main():
                     counts["duplicates"] += 1
                     continue
                 seen.add(key)
-                flags = pii(rec["ticket"]["description"] + "\n" + rec["label_or_answer"])
+                flags = pii(rec["ticket"]["description"] + "\n" + " ".join(rec["labels"].values()))
                 if flags:
+                    quarantine.append({"case_id": rec["case_id"], "source": src["id"], "flags": flags})
                     counts["quarantined"] += 1
                     continue
-                # Preserve upstream test; do not train on it.
-                split = "test" if upstream == "test" else split_for(key)
-                if src["id"] == "it_support" and upstream != "test" and split == "test":
-                    split = "validation"
+                # Preserve the publisher's test split. Validation is carved from train.
+                if upstream == "test":
+                    split = "test"
+                elif src["id"] == "it_support":
+                    split = "validation" if split_for(key) != "train" else "train"
+                else:
+                    split = split_for(digest(src["id"] + ":" + rec["source_group"]))
                 master[split].append(rec)
-                prompt = ("Classify this support ticket. Return JSON with category only:\n"
-                          if rec["task"] == "classification" else "") + rec["ticket"]["description"]
-                sft[split].append({
-                    "case_id": rec["case_id"], "source": src["id"],
-                    "messages": [
-                        {"role": "system", "content": SYSTEM},
-                        {"role": "user", "content": prompt},
-                        {"role": "assistant", "content": rec["label_or_answer"]}
-                    ]
-                })
+                sft[split].append(to_sft(rec))
                 counts[src["id"] + ":" + split] += 1
     for split in master:
         write(args.output / "master" / (split + ".jsonl"), master[split])
         write(args.output / "sft" / (split + ".jsonl"), sft[split])
-    (args.output / "manifest.json").write_text(json.dumps({
-        "counts": dict(counts), "sources": [s for s in sources if s["status"] == "enabled" or (args.include_bitext and s["id"] == "bitext")],
-        "warning": "PII checks are heuristic. Human privacy and licensing review required."
-    }, indent=2) + "\n")
-    print(dict(counts))
+    write(args.output / "quarantine.jsonl", quarantine)
+    manifest = {"schema_version": "1.1", "counts": dict(counts),
+                "accepted": sum(map(len, master.values())),
+                "quarantined": len(quarantine),
+                "sources": [s for s in sources if s["status"] == "enabled" or (args.include_bitext and s["id"] == "bitext")],
+                "warning": "Heuristic PII checks and exact deduplication do not replace privacy, license and semantic leakage reviews."}
+    args.output.mkdir(parents=True, exist_ok=True)
+    (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    print(json.dumps(manifest["counts"], indent=2))
 if __name__ == "__main__":
     main()
