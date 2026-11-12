@@ -48,6 +48,9 @@ jobs:
       - name: Validate cleaned records
         run: python datasets/validate.py --input datasets/cleaned
 
+      - name: Generate consolidated quality report
+        run: python datasets/quality_report.py
+
       - name: Display ingestion report
         if: always()
         run: |
@@ -68,4 +71,5 @@ jobs:
             datasets/generated/quarantine.jsonl
             datasets/eda/
             datasets/cleaned/
+            datasets/quality_report/
           retention-days: 30
