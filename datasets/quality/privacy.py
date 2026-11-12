@@ -99,11 +99,11 @@ def _collect_spans(text, use_ner=True):
     return spans, sorted(flags), counts
 
 
-def detect_flags(text):
+def detect_flags(text, use_ner=True):
     """Return PII categories found; does not expose matched values."""
     if not isinstance(text, str):
         return []
-    _, flags, _ = _collect_spans(text)
+    _, flags, _ = _collect_spans(text, use_ner=use_ner)
     return flags
 
 
