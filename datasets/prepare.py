@@ -165,11 +165,13 @@ def run(output, cache_dir, force_download=False, include_bitext=False,
                 original_fingerprint = record["fingerprint"]
                 description, flags, redaction_counts = redact_text(
                     record["ticket"]["description"],
-                    require_ner=not allow_regex_only
+                    require_ner=not allow_regex_only,
+                    use_ner=not allow_regex_only
                 )
                 label_text = " ".join(record["labels"].values())
                 _, label_flags, _ = redact_text(
-                    label_text, require_ner=not allow_regex_only
+                    label_text, require_ner=not allow_regex_only,
+                    use_ner=not allow_regex_only
                 )
 
                 if label_flags:
