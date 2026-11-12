@@ -64,6 +64,8 @@ jobs:
             datasets/generated/master/
             datasets/generated/sft/
             datasets/generated/manifest.json
+            datasets/generated/duplicate_audit.jsonl
+            datasets/generated/quarantine.jsonl
             datasets/eda/
             datasets/cleaned/
           retention-days: 30
