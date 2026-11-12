@@ -18,58 +18,63 @@ ROOT = Path(__file__).resolve().parent
 
 
 def deduplicate_records(records):
-    """Collapse repeats within a known identity; preserve distinct incidents.
+    """Deduplicate exact repeats without confusing distinct incident identities.
 
-    Conflicting labels for identical model inputs are quarantined because the
-    current SFT prompt has no additional feature to distinguish those labels.
+    Conflicting labels for the same exact model input and task are quarantined
+    across sources. Same-label rows from distinct verified incident IDs survive.
     """
-    groups = defaultdict(list)
+    global_groups = defaultdict(list)
     for record in records:
-        groups[(record["source"], record["fingerprint"])].append(record)
+        global_groups[(record["fingerprint"], record["task"])].append(record)
 
     chosen, duplicate_audit, conflict_quarantine = [], [], []
     stats = Counter()
+    conflicted_case_ids = set()
 
-    for (source, fingerprint), candidates in groups.items():
+    for (fingerprint, task), candidates in global_groups.items():
         labels = {json.dumps(r["labels"], sort_keys=True) for r in candidates}
-        ordered = sorted(
-            candidates,
-            key=lambda r: (r["upstream_split"] != "test", r["upstream_row"])
-        )
-
         if len(labels) > 1:
             stats["duplicate_label_conflict_groups"] += 1
-            stats["conflict_records_quarantined"] += len(ordered)
+            stats["conflict_records_quarantined"] += len(candidates)
+            conflicted_case_ids.update(r["case_id"] for r in candidates)
             duplicate_audit.append({
-                "source": source,
                 "fingerprint": fingerprint,
+                "task": task,
+                "sources": sorted({r["source"] for r in candidates}),
                 "label_conflict": True,
-                "decision": "quarantine_all_candidates_pending_review",
-                "candidate_count": len(ordered),
+                "decision": "quarantine_all_exact_input_candidates_across_sources",
+                "candidate_count": len(candidates),
                 "candidates": [{
                     "case_id": r["case_id"],
+                    "source": r["source"],
                     "upstream_split": r["upstream_split"],
-                    "upstream_row": r["upstream_row"],
                     "source_group_type": r.get("source_group_type", "unknown"),
                     "labels": r["labels"]
-                } for r in ordered]
+                } for r in candidates]
             })
-            for record in ordered:
+            for record in candidates:
                 conflict_quarantine.append({
                     "case_id": record["case_id"],
-                    "source": source,
+                    "source": record["source"],
                     "original_split": record["upstream_split"],
                     "reasons": ["duplicate_text_with_conflicting_labels"],
                     "fingerprint": fingerprint
                 })
-            continue
 
+    source_groups = defaultdict(list)
+    for record in records:
+        if record["case_id"] not in conflicted_case_ids:
+            source_groups[
+                (record["source"], record["fingerprint"], record["task"])
+            ].append(record)
+
+    for (source, fingerprint, task), candidates in source_groups.items():
         by_identity = defaultdict(list)
-        for record in ordered:
+        for record in candidates:
             by_identity[record["source_group"]].append(record)
 
         retained_for_text = []
-        for identity, identity_rows in by_identity.items():
+        for identity_rows in by_identity.values():
             identity_rows.sort(
                 key=lambda r: (r["upstream_split"] != "test", r["upstream_row"])
             )
@@ -82,6 +87,7 @@ def deduplicate_records(records):
                 duplicate_audit.append({
                     "source": source,
                     "fingerprint": fingerprint,
+                    "task": task,
                     "excluded_case_id": excluded["case_id"],
                     "retained_case_id": retained["case_id"],
                     "excluded_upstream_split": excluded["upstream_split"],
@@ -95,6 +101,7 @@ def deduplicate_records(records):
             duplicate_audit.append({
                 "source": source,
                 "fingerprint": fingerprint,
+                "task": task,
                 "decision": "preserve_same_text_distinct_incident_identities",
                 "identity_count": len(retained_for_text),
                 "incident_identity_verified": all(
@@ -105,7 +112,6 @@ def deduplicate_records(records):
             })
 
     return chosen, duplicate_audit, conflict_quarantine, stats
-
 
 def run(output, cache_dir, force_download=False, include_bitext=False,
         allow_regex_only=False):
