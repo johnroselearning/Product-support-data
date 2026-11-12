@@ -3,3 +3,5 @@ raw/
 cache/
 *.jsonl
 *.parquet
+
+eda/
