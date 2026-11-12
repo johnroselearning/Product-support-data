@@ -110,7 +110,7 @@ class ModularPipelineTests(unittest.TestCase):
 
     def test_same_identity_exact_duplicates_collapse(self):
         base = {
-            "source": "s", "fingerprint": "fp", "upstream_split": "train",
+            "source": "s", "fingerprint": "fp", "task": "classification", "upstream_split": "train",
             "upstream_row": 0, "case_id": "s-train-0",
             "source_group": "incident-1", "source_group_type": "incident_id",
             "labels": {"category": "A"}
@@ -143,7 +143,7 @@ class ModularPipelineTests(unittest.TestCase):
 
     def test_distinct_incidents_with_same_text_are_preserved(self):
         base = {
-            "source": "s", "fingerprint": "fp", "upstream_split": "train",
+            "source": "s", "fingerprint": "fp", "task": "classification", "upstream_split": "train",
             "upstream_row": 0, "case_id": "s-train-0",
             "source_group": "incident-1", "source_group_type": "incident_id",
             "labels": {"category": "A"}
