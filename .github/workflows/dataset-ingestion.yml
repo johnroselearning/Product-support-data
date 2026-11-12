@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: dataset-ingestion-main
+  cancel-in-progress: true
+
 jobs:
   ingest:
     runs-on: ubuntu-latest
