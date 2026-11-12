@@ -22,6 +22,7 @@ def validate(root, allow_regex_only=False):
     seen_ids = set()
     fingerprint_splits = {}
     group_splits = {}
+    incident_group_splits = {}
     errors = []
 
     for split in SPLITS:
@@ -65,6 +66,15 @@ def validate(root, allow_regex_only=False):
                     if group in group_splits and group_splits[group] != split:
                         raise ValueError("exact-text split group crosses split boundary")
                     group_splits[group] = split
+
+                    if rec.get("source_group_type") == "incident_id":
+                        incident_group = (rec["source"], rec["source_group"])
+                        if (
+                            incident_group in incident_group_splits
+                            and incident_group_splits[incident_group] != split
+                        ):
+                            raise ValueError("incident identity crosses split boundary")
+                        incident_group_splits[incident_group] = split
 
                     counts[split] += 1
                 except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
