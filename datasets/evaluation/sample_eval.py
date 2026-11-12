@@ -10,8 +10,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 
-def read_test_records(input_dir):
-    path = input_dir / "master" / "test.jsonl"
+def read_split_records(input_dir, split):
+    path = input_dir / "master" / f"{split}.jsonl"
     if not path.exists():
         raise FileNotFoundError(
             f"{path} not found. Run ingestion and cleaning before sampling."
@@ -72,7 +72,7 @@ def allocate_strata(strata, target):
     return allocation
 
 
-def build_review_case(record, stratum, seed):
+def build_review_case(record, stratum, seed, split):
     return {
         "case_id": record["case_id"],
         "task": record["task"],
@@ -100,7 +100,7 @@ def build_review_case(record, stratum, seed):
             "source_case_id": record["case_id"],
             "source_revision": str(record.get("source_revision", "unknown")),
             "license": str(record.get("license", "unknown")),
-            "source_split": "test"
+            "source_split": split
         },
         "selection": {
             "method": "stratified_by_task_and_source_label",
@@ -116,8 +116,10 @@ def build_review_case(record, stratum, seed):
     }
 
 
-def run(input_dir, output_path, manifest_path, size=150, seed=20261112):
-    records = read_test_records(input_dir)
+def run(input_dir, output_path, manifest_path, size=150, seed=20261112, split="test"):
+    if split not in {"validation", "test"}:
+        raise ValueError("split must be validation or test")
+    records = read_split_records(input_dir, split)
     # Exact text duplicates across sources are not independent eval examples.
     by_fingerprint = defaultdict(list)
     for record in records:
@@ -157,7 +159,7 @@ def run(input_dir, output_path, manifest_path, size=150, seed=20261112):
         )
 
     cases = [
-        build_review_case(record, stratum, seed)
+        build_review_case(record, stratum, seed, split)
         for record, stratum in sorted(selected, key=lambda item: item[0]["case_id"])
     ]
 
@@ -171,7 +173,7 @@ def run(input_dir, output_path, manifest_path, size=150, seed=20261112):
     manifest = {
         "version": "review_queue_v1",
         "status": "pending_human_review_not_gold_eval",
-        "input_split": "cleaned/master/test.jsonl",
+        "input_split": f"cleaned/master/{split}.jsonl",
         "requested_size": size,
         "actual_size": len(cases),
         "seed": seed,
@@ -203,9 +205,10 @@ def main():
     )
     parser.add_argument("--size", type=int, default=150)
     parser.add_argument("--seed", type=int, default=20261112)
+    parser.add_argument("--split", choices=["validation", "test"], default="test")
     args = parser.parse_args()
     print(json.dumps(
-        run(args.input, args.output, args.manifest, args.size, args.seed),
+        run(args.input, args.output, args.manifest, args.size, args.seed, args.split),
         indent=2
     ))
 
