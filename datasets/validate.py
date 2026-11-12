@@ -55,13 +55,13 @@ def validate(root, allow_regex_only=False):
                         raise ValueError("duplicate case ID")
                     seen_ids.add(case_id)
 
-                    fingerprint_key = (rec["source"], rec["fingerprint"])
+                    fingerprint_key = rec["fingerprint"]
                     previous_split = fingerprint_splits.get(fingerprint_key)
                     if previous_split is not None and previous_split != split:
                         raise ValueError("identical text crosses split boundary")
                     fingerprint_splits[fingerprint_key] = split
 
-                    group = (rec["source"], rec["split_group"])
+                    group = rec["split_group"]
                     if group in group_splits and group_splits[group] != split:
                         raise ValueError("exact-text split group crosses split boundary")
                     group_splits[group] = split
