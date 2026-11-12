@@ -92,6 +92,11 @@ Use:
 
 Never train on test records or on the evaluation review queue.
 
+
+## Outcome eligibility is task-specific
+
+Do not globally discard every ticket without a confirmed resolution. The current enabled sources supervise ticket category and source priority; those tasks can use tickets without a verified fix. They must not be repurposed as root-cause or resolution supervision. For future RCA/resolution tasks, require a verified technical diagnosis, a documented fix, and verification evidence; exclude spam, customer-only closures, and ambiguous outcomes from those task-specific targets. Keep unresolved examples for abstention/evidence-sufficiency evaluation only when a human reviewer explicitly labels them.
+
 ## Human-reviewed evaluation framework
 
 See evaluation/README.md. Generate a 150-case stratified review queue from the cleaned test split; generate a separate dev queue from validation using --split validation:
