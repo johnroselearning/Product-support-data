@@ -32,3 +32,7 @@ Source revisions default to `main`; for reproducible releases, pin each source t
 ## Exploratory Data Analysis
 
 After ingestion and validation, run `python datasets/eda.py`. It reads only normalized master JSONL files and writes `datasets/eda/` with a JSON summary, CSV profiles, and PNG charts. It never edits raw snapshots or normalized records. Review label distributions, text lengths, duplicates, and privacy flags before defining cleaning rules. EDA is descriptive; it does not automatically remove or relabel records.
+
+## Conservative cleaning
+
+After reviewing EDA, run `python datasets/cleaning/clean.py`. It reads normalized master records and writes a separate `datasets/cleaned/` output plus `cleaning_report.json` and `quarantine.jsonl`. It only normalizes line endings, removes NUL bytes, trims edge whitespace, checks required labels, rechecks obvious PII, and removes exact duplicates created by safe normalization. It preserves label identity and does not delete records for unusual text length. It never modifies raw snapshots or normalized master files. Validate the cleaned output with `python datasets/validate.py --input datasets/cleaned`.
