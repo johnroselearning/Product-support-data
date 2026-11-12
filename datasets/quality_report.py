@@ -23,7 +23,16 @@ def run(root, out):
             labels[r["source"]+":"+key][str(value)]+=1
     conflicts=[r for r in duplicates if r.get("label_conflict")]
     dup_by_source=Counter(r["source"] for r in duplicates)
-    dup_splits=Counter(str(r.get("excluded_upstream_split"))+" -> "+str(r.get("retained_upstream_split")) for r in duplicates)
+    split_counts=Counter()
+    for item in duplicates:
+        if item.get("candidates"):
+            for candidate in item["candidates"]:
+                split_counts[str(candidate.get("upstream_split"))]+=1
+        else:
+            split_counts[str(item.get("excluded_upstream_split"))+" -> "+str(item.get("retained_upstream_split"))]+=1
+    privacy_count=sum(1 for r in quarantine if r.get("flags"))
+    conflict_record_count=sum(1 for r in quarantine if "duplicate_text_with_conflicting_labels" in r.get("reasons",[]))
+    quarantine_reasons=Counter(reason for r in quarantine for reason in r.get("reasons",[]))
     lengths=sorted(len(r["ticket"]["description"]) for r in records)
     def percentile(p):
         return lengths[min(len(lengths)-1,round((len(lengths)-1)*p))] if lengths else None
@@ -39,23 +48,27 @@ def run(root, out):
       "technical_communication":"not_supported_by_current_verified_targets"
     }
     result={
-      "report_version":"1.0","cleaned_record_count":len(records),
+      "report_version":"1.1","cleaned_record_count":len(records),
       "cleaned_by_split":{k:len(v) for k,v in split_rows.items()},
       "cleaned_by_source":dict(by_source),"cleaned_by_task":dict(by_task),
       "label_counts":{k:dict(v) for k,v in labels.items()},
-      "duplicate_audit":{"records":len(duplicates),"by_source":dict(dup_by_source),
-        "upstream_split_pairs":dict(dup_splits),"label_conflict_count":len(conflicts),
-        "label_conflict_examples":conflicts[:25]},
-      "privacy_quarantine":{"ingestion_quarantine":len(quarantine),
-        "cleaning_quarantine":len(clean_quarantine),
+      "duplicate_audit":{"audit_entries":len(duplicates),"same_label_excluded_records":sum(1 for r in duplicates if not r.get("label_conflict")),
+        "conflicting_label_groups":len(conflicts),"by_source":dict(dup_by_source),
+        "candidate_records_by_upstream_split":dict(split_counts),
+        "conflicting_label_examples":conflicts[:25]},
+      "quarantine":{"total_ingestion_records":len(quarantine),
+        "privacy_flagged_records":privacy_count,
+        "conflicting_duplicate_records":conflict_record_count,
+        "ingestion_reasons":dict(quarantine_reasons),
+        "cleaning_records":len(clean_quarantine),
         "cleaning_reasons":dict(Counter(reason for r in clean_quarantine for reason in r.get("reasons",[])))},
       "text_length_chars":{"min":min(lengths) if lengths else None,"median":percentile(.5),
         "p95":percentile(.95),"max":max(lengths) if lengths else None},
       "capability_coverage":capability,
       "recommendations":[
-        "Manually review duplicate label conflicts before deciding which target is valid.",
-        "Inspect duplicate source/split pairs; distinguish repeated text from repeated incident identity.",
-        "Review privacy quarantine manually; do not publish quarantined text in reports or artifacts.",
+        "Manually review duplicate label conflicts before deciding whether any candidate label is valid.",
+        "Inspect duplicate source/split groups and distinguish repeated descriptions from repeated incident identity.",
+        "Review privacy-flagged quarantine manually; do not publish sensitive text in reports or artifacts.",
         "Collect more independently verified examples for rare labels; do not balance by naive duplication.",
         "Collect multi-turn troubleshooting traces with verified resolutions.",
         "Collect sanitized logs linked to independently verified diagnoses and evidence.",
@@ -74,19 +87,20 @@ def run(root, out):
     lines=["# Dataset Quality and Capability Gap Report","",
       "Cleaned records: **"+str(len(records))+"**","","## Records by source",""]
     lines += ["- "+k+": "+str(v) for k,v in by_source.items()] or ["- No cleaned records found."]
-    lines += ["","## Duplicate audit","","- Duplicate audit rows: "+str(len(duplicates)),
-      "- Conflicting label rows: "+str(len(conflicts)),
-      "- Ingestion quarantine: "+str(len(quarantine)),
-      "- Cleaning quarantine: "+str(len(clean_quarantine)),"","## Capability coverage",""]
+    lines += ["","## Duplicate audit","","- Duplicate audit entries: "+str(len(duplicates)),
+      "- Same-label excluded records: "+str(result["duplicate_audit"]["same_label_excluded_records"]),
+      "- Conflicting-label groups: "+str(len(conflicts)),
+      "- Conflicting-label candidate records quarantined: "+str(conflict_record_count),
+      "- Privacy-flagged records quarantined: "+str(privacy_count),
+      "- Cleaning quarantine records: "+str(len(clean_quarantine)),"","## Capability coverage",""]
     lines += ["- **"+k.replace("_"," ").title()+"**: "+v for k,v in capability.items()]
     lines += ["","## Recommended next data acquisition","",
-      "1. Multi-turn IT troubleshooting conversations with verified resolutions.",
+      "1. Multi-turn IT troubleshooting traces with verified resolutions.",
       "2. Incident timelines linking symptoms, diagnostic steps, evidence and confirmed root causes.",
-      "3. Log-analysis examples with sanitized logs and independently verified diagnosis.",
-      "4. Tool-call traces with tool schemas, arguments, outputs, errors and safe/unsafe action labels.",
-      "5. Resolution and post-incident records with explicit verification evidence.",
-      "6. Human-reviewed technical communication examples for customer updates and handoffs.",
-      "","See dataset_quality_report.json for detailed counts and conflict examples."]
+      "3. Sanitized logs with independently verified diagnoses.",
+      "4. Tool-call traces with schemas, arguments, outputs, errors and action-safety labels.",
+      "5. Resolution records with explicit verification evidence.",
+      "6. Human-reviewed technical communication examples for customer updates and handoffs."]
     (out/"DATASET_QUALITY_REPORT.md").write_text("\n".join(lines)+"\n")
     return result
 
