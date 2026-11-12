@@ -22,15 +22,27 @@ def run(root, out):
         for key,value in r.get("labels",{}).items():
             labels[r["source"]+":"+key][str(value)]+=1
     conflicts=[r for r in duplicates if r.get("label_conflict")]
-    dup_by_source=Counter(r["source"] for r in duplicates)
+    dup_by_source=Counter()
+    decision_counts=Counter()
     split_counts=Counter()
     for item in duplicates:
+        decision_counts[item.get("decision", "unknown")] += 1
+        if item.get("source"):
+            dup_by_source[item["source"]] += 1
+        for source in item.get("sources", []):
+            dup_by_source[source] += 1
         if item.get("candidates"):
             for candidate in item["candidates"]:
-                split_counts[str(candidate.get("upstream_split"))]+=1
-        else:
-            split_counts[str(item.get("excluded_upstream_split"))+" -> "+str(item.get("retained_upstream_split"))]+=1
+                split_counts[str(candidate.get("upstream_split"))] += 1
+        elif item.get("excluded_upstream_split") or item.get("retained_upstream_split"):
+            split_counts[
+                str(item.get("excluded_upstream_split")) + " -> " +
+                str(item.get("retained_upstream_split"))
+            ] += 1
     privacy_count=sum(1 for r in quarantine if r.get("flags"))
+    redacted_pii_count=sum(
+      1 for r in records if r.get("quality", {}).get("privacy_flags")
+    )
     conflict_record_count=sum(1 for r in quarantine if "duplicate_text_with_conflicting_labels" in r.get("reasons",[]))
     quarantine_reasons=Counter(reason for r in quarantine for reason in r.get("reasons",[]))
     lengths=sorted(len(r["ticket"]["description"]) for r in records)
@@ -57,12 +69,18 @@ def run(root, out):
       "cleaned_by_split":{k:len(v) for k,v in split_rows.items()},
       "cleaned_by_source":dict(by_source),"cleaned_by_task":dict(by_task),
       "label_counts":{k:dict(v) for k,v in labels.items()},
-      "duplicate_audit":{"audit_entries":len(duplicates),"same_label_excluded_records":sum(1 for r in duplicates if not r.get("label_conflict")),
-        "conflicting_label_groups":len(conflicts),"by_source":dict(dup_by_source),
+      "duplicate_audit":{"audit_entries":len(duplicates),"same_label_excluded_records":sum(
+          1 for r in duplicates
+          if r.get("decision") == "collapse_repeat_within_same_incident_identity"
+        ),
+        "conflicting_label_groups":len(conflicts),
+        "decision_counts":dict(decision_counts),
+        "by_source":dict(dup_by_source),
         "candidate_records_by_upstream_split":dict(split_counts),
         "conflicting_label_examples":conflicts[:25]},
       "quarantine":{"total_ingestion_records":len(quarantine),
         "privacy_flagged_records":privacy_count,
+        "records_with_pii_redacted":redacted_pii_count,
         "conflicting_duplicate_records":conflict_record_count,
         "ingestion_reasons":dict(quarantine_reasons),
         "cleaning_records":len(clean_quarantine),
@@ -98,6 +116,7 @@ def run(root, out):
       "- Conflicting-label groups: "+str(len(conflicts)),
       "- Conflicting-label candidate records quarantined: "+str(conflict_record_count),
       "- Privacy-flagged records quarantined: "+str(privacy_count),
+      "- Records with PII redacted before export: "+str(redacted_pii_count),
       "- Near-duplicate candidate pairs (human review only): "+str((near_duplicate_summary or {}).get("near_duplicate_pairs", "not run")),
       "- Cleaning quarantine records: "+str(len(clean_quarantine)),"","## Capability coverage",""]
     lines += ["- **"+k.replace("_"," ").title()+"**: "+v for k,v in capability.items()]
