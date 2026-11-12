@@ -1,8 +1,10 @@
 """Conservative, auditable cleaning of normalized records. Never edits raw/master inputs."""
 import argparse
+import sys
 import json
 from collections import Counter
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from exporters.jsonl import write_jsonl
 from quality.privacy import detect_flags
 
