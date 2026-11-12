@@ -14,7 +14,6 @@
     {
       "id": "helpdesk",
       "repo": "tasksource/help-desk-tickets",
-      "config": "reporter_messages",
       "license": "cc-by-4.0",
       "status": "enabled",
       "adapter": "helpdesk",
