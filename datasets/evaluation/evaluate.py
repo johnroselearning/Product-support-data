@@ -34,6 +34,8 @@ def f1_from_counts(tp, fp, fn):
 
 
 def evaluate(gold_rows, prediction_rows):
+    if not gold_rows:
+        raise ValueError("Gold evaluation set is empty.")
     gold_by_id = {}
     gold_splits = set()
     for row in gold_rows:
