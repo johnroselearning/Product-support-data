@@ -38,13 +38,25 @@ def run(output, cache_dir, force_download=False, include_bitext=False):
                     continue
                 all_records.append(record)
     # Deduplicate per source. Prefer publisher test rows when duplicate text straddles splits.
-    chosen, seen = [], {}
+    chosen, seen, duplicate_audit = [], {}, []
     for record in sorted(all_records, key=lambda r: (r["upstream_split"] != "test", r["upstream_row"])):
         key = (record["source"], record["fingerprint"])
         if key in seen:
             stats["duplicates"] += 1
+            retained = seen[key]
+            duplicate_audit.append({
+                "source": record["source"],
+                "fingerprint": record["fingerprint"],
+                "excluded_case_id": record["case_id"],
+                "retained_case_id": retained["case_id"],
+                "excluded_upstream_split": record["upstream_split"],
+                "retained_upstream_split": retained["upstream_split"],
+                "excluded_labels": record["labels"],
+                "retained_labels": retained["labels"],
+                "label_conflict": record["labels"] != retained["labels"]
+            })
             continue
-        seen[key] = True
+        seen[key] = record
         chosen.append(record)
     assignments = assign_records(chosen)
     master = {name: [] for name in ("train", "validation", "test")}
@@ -58,11 +70,14 @@ def run(output, cache_dir, force_download=False, include_bitext=False):
         write_jsonl(output / "master" / f"{split}.jsonl", master[split])
         write_jsonl(output / "sft" / f"{split}.jsonl", sft[split])
     write_jsonl(output / "quarantine.jsonl", quarantined)
+    write_jsonl(output / "duplicate_audit.jsonl", duplicate_audit)
     manifest = {
         "schema_version": "1.2",
         "counts": dict(stats),
         "accepted": len(chosen),
         "quarantined": len(quarantined),
+        "duplicate_audit_records": len(duplicate_audit),
+        "duplicate_label_conflicts": sum(1 for item in duplicate_audit if item["label_conflict"]),
         "sources": source_runs,
         "policy": "Source test groups are held out as test; duplicate records prefer publisher test copy.",
         "warning": "Heuristic PII detection is not complete anonymization. Human privacy and license review remain required."
