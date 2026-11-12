@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r datasets/requirements.txt
 
+      - name: Install spaCy English NER model
+        run: python -m spacy download en_core_web_sm
+
       - name: Run unit tests
         run: python -m unittest discover -s datasets/tests -v
 
@@ -50,6 +53,12 @@ jobs:
 
       - name: Generate consolidated quality report
         run: python datasets/quality_report.py
+
+      - name: Detect near-duplicate tickets for human review
+        run: python datasets/quality/near_duplicates.py
+
+      - name: Generate stratified evaluation review queue
+        run: python datasets/evaluation/sample_eval.py --size 150 --seed 20261112
 
       - name: Display ingestion report
         if: always()
@@ -72,4 +81,6 @@ jobs:
             datasets/eda/
             datasets/cleaned/
             datasets/quality_report/
+            datasets/evaluation/review_queue_v1.jsonl
+            datasets/evaluation/review_queue_manifest.json
           retention-days: 30
