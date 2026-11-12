@@ -36,3 +36,9 @@ After ingestion and validation, run `python datasets/eda.py`. It reads only norm
 ## Conservative cleaning
 
 After reviewing EDA, run `python datasets/cleaning/clean.py`. It reads normalized master records and writes a separate `datasets/cleaned/` output plus `cleaning_report.json` and `quarantine.jsonl`. It only normalizes line endings, removes NUL bytes, trims edge whitespace, checks required labels, rechecks obvious PII, and removes exact duplicates created by safe normalization. It preserves label identity and does not delete records for unusual text length. It never modifies raw snapshots or normalized master files. Validate the cleaned output with `python datasets/validate.py --input datasets/cleaned`.
+
+## Consolidated quality report and capability gaps
+
+After EDA and cleaning, run `python datasets/quality_report.py`. It writes JSON and Markdown summaries under `datasets/quality_report/`, including cleaned counts, duplicate audit conflicts, quarantine counts, label distributions, text lengths, and a support-agent capability gap. Review `DATASET_GAP_ANALYSIS.md` before enabling any new source. New candidates remain `review_required` and are not downloaded by default.
+
+Cleaned SFT files are written to `datasets/cleaned/sft/` alongside cleaned master files. Keep raw, normalized and cleaned layers separate. The cleaning stage is intentionally conservative and does not infer technical diagnoses or resolutions.
