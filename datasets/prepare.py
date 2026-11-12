@@ -60,7 +60,7 @@ def main():
     sft = {s: [] for s in master}
     seen, counts = set(), Counter()
     for src in sources:
-        if not src["enabled"] and not (args.include_bitext and src["id"] == "bitext"):
+        if src["status"] != "enabled" and not (args.include_bitext and src["id"] == "bitext"):
             continue
         dataset = load_dataset(src["repo"])
         for upstream, rows in dataset.items():
@@ -98,7 +98,7 @@ def main():
         write(args.output / "master" / (split + ".jsonl"), master[split])
         write(args.output / "sft" / (split + ".jsonl"), sft[split])
     (args.output / "manifest.json").write_text(json.dumps({
-        "counts": dict(counts), "sources": [s for s in sources if s["enabled"] or args.include_bitext],
+        "counts": dict(counts), "sources": [s for s in sources if s["status"] == "enabled" or (args.include_bitext and s["id"] == "bitext")],
         "warning": "PII checks are heuristic. Human privacy and licensing review required."
     }, indent=2) + "\n")
     print(dict(counts))
