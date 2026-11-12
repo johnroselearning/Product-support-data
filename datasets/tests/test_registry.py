@@ -7,7 +7,7 @@ class RegistryTests(unittest.TestCase):
         sources = json.loads(REGISTRY.read_text())["sources"]
         ids = [s["id"] for s in sources]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertTrue({"it_support","helpdesk","polaris","glaive","swe_extra","bitext","tobi","itbench","loghub"}.issubset(ids))
+        self.assertTrue({"it_support","helpdesk","polaris","glaive","swe_extra","bitext","tobi","itbench","loghub","infra_ops","incident_management_events","planning2interaction"}.issubset(ids))
     def test_noncommercial_sources_not_enabled(self):
         for s in json.loads(REGISTRY.read_text())["sources"]:
             if "-nc-" in s["license"].lower():
