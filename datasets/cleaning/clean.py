@@ -162,9 +162,14 @@ def run(input_dir, output_dir, allow_regex_only=False):
 
     for split, records in accepted.items():
         write_jsonl(output_dir / "master" / f"{split}.jsonl", records)
-        sft_records = [to_sft(record) for record in records]
-        write_jsonl(output_dir / "sft" / f"{split}.jsonl", sft_records)
+        if split in ("train", "validation"):
+            sft_records = [to_sft(record) for record in records]
+            write_jsonl(output_dir / "sft" / f"{split}.jsonl", sft_records)
         report["by_split"][split] = len(records)
+
+    stale_test_sft = output_dir / "sft" / "test.jsonl"
+    if stale_test_sft.exists():
+        stale_test_sft.unlink()
 
     report["accepted_records"] = sum(map(len, accepted.values()))
     report["excluded_records"] = len(quarantine)
