@@ -12,4 +12,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m unittest discover -s datasets/tests -v
+          cache: pip
+          cache-dependency-path: datasets/requirements.txt
+      - name: Install dataset dependencies
+        run: pip install -r datasets/requirements.txt
+      - name: Run unit tests
+        run: python -m unittest discover -s datasets/tests -v
