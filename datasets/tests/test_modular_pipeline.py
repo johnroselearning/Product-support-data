@@ -92,7 +92,7 @@ class ModularPipelineTests(unittest.TestCase):
 
     def test_conflicting_duplicate_labels_quarantine_all(self):
         base = {
-            "source": "s", "fingerprint": "fp", "upstream_split": "train",
+            "source": "s", "fingerprint": "fp", "task": "classification", "upstream_split": "train",
             "upstream_row": 0, "case_id": "s-train-0",
             "source_group": "g1", "source_group_type": "incident_id",
             "labels": {"category": "A"}
