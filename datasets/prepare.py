@@ -1,135 +1,84 @@
-"""Normalize permitted public support datasets into provenance-rich JSONL."""
+"""Orchestrate download -> adapt -> privacy screen -> group split -> export."""
 import argparse
-import hashlib
 import json
-import re
 from collections import Counter
 from pathlib import Path
+from datasets.downloaders.huggingface import download_source
+from datasets.adapters.registry import get_adapter
+from datasets.quality.privacy import detect_flags
+from datasets.splitting.group_split import assign_records
+from datasets.normalization.sft import to_sft
+from datasets.exporters.jsonl import write_jsonl
 
 ROOT = Path(__file__).resolve().parent
-SYSTEM = "You are a technical support engineer. Never invent evidence or verified root causes."
-PATTERNS = {
-    "email": re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b"),
-    "phone": re.compile(r"(?<!\d)(?:\+?\d[\s().-]?){10,15}(?!\d)"),
-    "secret": re.compile(r"(?i)\b(?:api[_-]?key|password|secret|bearer)\s*[:=]\s*\S+"),
-}
-def digest(s):
-    return hashlib.sha256(" ".join(s.casefold().split()).encode()).hexdigest()
-def pii(s):
-    return [name for name, pattern in PATTERNS.items() if pattern.search(s)]
-def split_for(key):
-    bucket = int(key[:8], 16) % 100
-    return "train" if bucket < 80 else "validation" if bucket < 90 else "test"
-def write(path, rows):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
-def normalize(source, row, features, upstream, index):
-    if source == "it_support":
-        if set(row) != {"text", "label"}:
-            raise ValueError("Unexpected IT support source schema")
-        text = row["text"]
-        label = row["label"]
-        if isinstance(label, int) and hasattr(features["label"], "int2str"):
-            label = features["label"].int2str(label)
-        task, labels = "classification", {"category": str(label)}
-        group = digest(text)
-    elif source == "helpdesk":
-        expected = {"issue_id", "text", "issue_priority"}
-        if not expected.issubset(row):
-            raise ValueError("Unexpected helpdesk source schema")
-        text = row["text"]
-        task, labels = "priority_label", {"priority_source": str(row["issue_priority"])}
-        group = upstream + ":" + str(row["issue_id"])
-    elif source == "bitext":
-        expected = {"instruction", "response"}
-        if not expected.issubset(row):
-            raise ValueError("Unexpected Bitext source schema")
-        text = row["instruction"]
-        task, labels = "response", {"reference_response": row["response"]}
-        group = digest(text)
-    else:
-        raise ValueError("Unsupported adapter: " + source)
-    if not isinstance(text, str) or not text.strip() or any(not isinstance(v, str) or not v.strip() for v in labels.values()):
-        return None
-    key = digest(text)
-    return {
-        "schema_version": "1.1", "case_id": source + "-" + key[:16],
-        "source": source, "upstream_split": upstream, "upstream_row": index,
-        "source_group": group, "task": task, "ticket": {"description": text},
-        "labels": labels, "evidence": [], "actions": [], "root_cause": "unknown",
-        "resolution": "unknown", "quality": {"status": "unreviewed"},
-        "fingerprint": key,
-    }
-def to_sft(rec):
-    text, labels = rec["ticket"]["description"], rec["labels"]
-    if rec["task"] == "classification":
-        user = "Classify this support ticket. Return JSON with category only:\n" + text
-        answer = json.dumps({"category": labels["category"]}, ensure_ascii=False)
-    elif rec["task"] == "priority_label":
-        user = "Return the original ticket priority label as JSON with priority_source only:\n" + text
-        answer = json.dumps({"priority_source": labels["priority_source"]}, ensure_ascii=False)
-    else:
-        user, answer = text, labels["reference_response"]
-    return {"case_id": rec["case_id"], "source": rec["source"],
-            "messages": [{"role": "system", "content": SYSTEM},
-                         {"role": "user", "content": user},
-                         {"role": "assistant", "content": answer}]}
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--include-bitext", action="store_true", help="Requires independent license review")
-    p.add_argument("--output", type=Path, default=ROOT / "generated")
-    args = p.parse_args()
-    from datasets import load_dataset
-    sources = json.loads((ROOT / "sources.json").read_text())["sources"]
-    master = {s: [] for s in ("train", "validation", "test")}
-    sft = {s: [] for s in master}
-    quarantine, seen, counts = [], set(), Counter()
-    for src in sources:
-        if src["status"] != "enabled" and not (args.include_bitext and src["id"] == "bitext"):
+
+def run(output, cache_dir, force_download=False, include_bitext=False):
+    registry = json.loads((ROOT / "sources.json").read_text())
+    raw_dir = ROOT / "raw"
+    all_records, quarantined, stats, source_runs = [], [], Counter(), []
+    for source in registry["sources"]:
+        enabled = source["status"] == "enabled" or (include_bitext and source["id"] == "bitext")
+        if not enabled:
             continue
-        kwargs = {"path": src["repo"]}
-        if src.get("config"):
-            kwargs["name"] = src["config"]
-        dataset = load_dataset(**kwargs)
-        for upstream, rows in dataset.items():
-            for i, row in enumerate(rows):
-                rec = normalize(src["id"], row, rows.features, upstream, i)
-                if rec is None:
-                    counts["invalid"] += 1
+        adapter = get_adapter(source["id"])
+        dataset, download_info = download_source(source, raw_dir, cache_dir, force_download)
+        source_runs.append({"source": source["id"], **download_info})
+        for upstream_split, rows in dataset.items():
+            stats[f'{source["id"]}:downloaded:{upstream_split}'] += len(rows)
+            for index, row in enumerate(rows):
+                record = adapter(source, row, rows.features, upstream_split, index)
+                if record is None:
+                    stats["invalid"] += 1
                     continue
-                key = (src["id"], rec["fingerprint"])
-                if key in seen:
-                    counts["duplicates"] += 1
-                    continue
-                seen.add(key)
-                flags = pii(rec["ticket"]["description"] + "\n" + " ".join(rec["labels"].values()))
+                flags = detect_flags(record["ticket"]["description"] + "\n" + " ".join(record["labels"].values()))
                 if flags:
-                    quarantine.append({"case_id": rec["case_id"], "source": src["id"], "flags": flags})
-                    counts["quarantined"] += 1
+                    record["quality"]["privacy_flags"] = flags
+                    quarantined.append({"case_id": record["case_id"], "source": source["id"], "flags": flags})
+                    stats["quarantined"] += 1
                     continue
-                # Preserve the publisher's test split. Validation is carved from train.
-                if upstream == "test":
-                    split = "test"
-                elif src["id"] == "it_support":
-                    split = "validation" if split_for(rec["fingerprint"]) != "train" else "train"
-                else:
-                    split = split_for(digest(src["id"] + ":" + rec["source_group"]))
-                master[split].append(rec)
-                sft[split].append(to_sft(rec))
-                counts[src["id"] + ":" + split] += 1
+                all_records.append(record)
+    # Deduplicate per source. Prefer publisher test rows when duplicate text straddles splits.
+    chosen, seen = [], {}
+    for record in sorted(all_records, key=lambda r: (r["upstream_split"] != "test", r["upstream_row"])):
+        key = (record["source"], record["fingerprint"])
+        if key in seen:
+            stats["duplicates"] += 1
+            continue
+        seen[key] = True
+        chosen.append(record)
+    assignments = assign_records(chosen)
+    master = {name: [] for name in ("train", "validation", "test")}
+    sft = {name: [] for name in master}
+    for record in chosen:
+        split = assignments[(record["source"], record["source_group"])]
+        master[split].append(record)
+        sft[split].append(to_sft(record))
+        stats[f'{record["source"]}:normalized:{split}'] += 1
     for split in master:
-        write(args.output / "master" / (split + ".jsonl"), master[split])
-        write(args.output / "sft" / (split + ".jsonl"), sft[split])
-    write(args.output / "quarantine.jsonl", quarantine)
-    manifest = {"schema_version": "1.1", "counts": dict(counts),
-                "accepted": sum(map(len, master.values())),
-                "quarantined": len(quarantine),
-                "sources": [s for s in sources if s["status"] == "enabled" or (args.include_bitext and s["id"] == "bitext")],
-                "warning": "Heuristic PII checks and exact deduplication do not replace privacy, license and semantic leakage reviews."}
-    args.output.mkdir(parents=True, exist_ok=True)
-    (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-    print(json.dumps(manifest["counts"], indent=2))
+        write_jsonl(output / "master" / f"{split}.jsonl", master[split])
+        write_jsonl(output / "sft" / f"{split}.jsonl", sft[split])
+    write_jsonl(output / "quarantine.jsonl", quarantined)
+    manifest = {
+        "schema_version": "1.2",
+        "counts": dict(stats),
+        "accepted": len(chosen),
+        "quarantined": len(quarantined),
+        "sources": source_runs,
+        "policy": "Source test groups are held out as test; duplicate records prefer publisher test copy.",
+        "warning": "Heuristic PII detection is not complete anonymization. Human privacy and license review remain required."
+    }
+    output.mkdir(parents=True, exist_ok=True)
+    (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    return manifest
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=ROOT / "generated")
+    parser.add_argument("--cache-dir", type=Path, default=ROOT / "cache")
+    parser.add_argument("--force-download", action="store_true")
+    parser.add_argument("--include-bitext", action="store_true", help="Only after license review")
+    args = parser.parse_args()
+    result = run(args.output, args.cache_dir, args.force_download, args.include_bitext)
+    print(json.dumps(result, indent=2))
 if __name__ == "__main__":
     main()
