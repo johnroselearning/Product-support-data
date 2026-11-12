@@ -102,7 +102,7 @@ def run(root, out):
       ],
       "limitations":[
         "This report summarizes metadata and does not judge semantic correctness.",
-        "Zero regex privacy flags is not proof of de-identification.",
+        "Zero automated privacy-detector flags is not proof of de-identification.",
         "The current two sources supervise classification and priority, not a complete technical-support agent."
       ]
     }
