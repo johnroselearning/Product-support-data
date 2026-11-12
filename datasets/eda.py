@@ -41,7 +41,7 @@ def run(input_dir, output_dir):
       "text_length_words":{"min":int(df.text_words.min()),"median":float(df.text_words.median()),"p95":float(df.text_words.quantile(.95)),"max":int(df.text_words.max())},
       "empty_text_count":int((df.description.str.strip()=="").sum()),
       "duplicate_fingerprints_within_source":int(df.duplicated(["source","fingerprint"]).sum()),
-      "duplicate_fingerprints_across_splits":int(df.duplicated(["source","fingerprint"]).sum()),
+      "fingerprint_groups_crossing_splits":int((df.groupby(["source","fingerprint"])["split"].nunique()>1).sum()),
       "privacy_flagged_master_records":int(df.privacy_flags.map(bool).sum()),
       "missing_label_count":int(df.label_value.str.strip().eq("").sum())
     }
