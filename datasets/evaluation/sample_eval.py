@@ -1,4 +1,4 @@
-"""Create a stratified human-review queue from the held-out cleaned test split.
+"""Create a stratified human-review queue from a cleaned validation or test split.
 
 This creates pending annotations, not a gold evaluation set. No RCA, resolution,
 tool expectation, or answerability label is inferred.
@@ -145,7 +145,7 @@ def run(input_dir, output_path, manifest_path, size=150, seed=20261112, split="t
         strata[stratum].append(record)
 
     if not eligible:
-        raise ValueError("No eligible held-out test records available.")
+        raise ValueError(f"No eligible records available in the {split} split.")
 
     allocation = allocate_strata(strata, size)
     rng = random.Random(seed)
@@ -171,7 +171,7 @@ def run(input_dir, output_path, manifest_path, size=150, seed=20261112, split="t
     by_task = Counter(case["task"] for case in cases)
     by_stratum = Counter(case["selection"]["stratum"] for case in cases)
     manifest = {
-        "version": "review_queue_v1",
+        "version": f"{split}_review_queue_v1",
         "status": "pending_human_review_not_gold_eval",
         "input_split": f"cleaned/master/{split}.jsonl",
         "requested_size": size,
@@ -195,20 +195,17 @@ def main():
         "--input", type=Path,
         default=Path(__file__).resolve().parents[1] / "cleaned"
     )
-    parser.add_argument(
-        "--output", type=Path,
-        default=Path(__file__).resolve().parent / "review_queue_v1.jsonl"
-    )
-    parser.add_argument(
-        "--manifest", type=Path,
-        default=Path(__file__).resolve().parent / "review_queue_manifest.json"
-    )
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--manifest", type=Path)
     parser.add_argument("--size", type=int, default=150)
     parser.add_argument("--seed", type=int, default=20261112)
     parser.add_argument("--split", choices=["validation", "test"], default="test")
     args = parser.parse_args()
+    default_name = "review_queue_v1" if args.split == "test" else "dev_review_queue_v1"
+    output = args.output or (Path(__file__).resolve().parent / f"{default_name}.jsonl")
+    manifest = args.manifest or (Path(__file__).resolve().parent / f"{default_name}_manifest.json")
     print(json.dumps(
-        run(args.input, args.output, args.manifest, args.size, args.seed, args.split),
+        run(args.input, output, manifest, args.size, args.seed, args.split),
         indent=2
     ))
 
