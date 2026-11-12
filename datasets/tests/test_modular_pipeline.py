@@ -19,12 +19,14 @@ class ModularPipelineTests(unittest.TestCase):
 
     def test_test_group_is_held_out(self):
         rows = [
-            {"source": "s", "source_group": "g", "split_group": "same",
+            {"source": "source-a", "source_group": "g", "split_group": "same",
              "upstream_split": "train"},
-            {"source": "s", "source_group": "h", "split_group": "same",
+            {"source": "source-b", "source_group": "h", "split_group": "same",
              "upstream_split": "test"}
         ]
-        self.assertEqual(assign_records(rows)[("s", "same")], "test")
+        assignments = assign_records(rows)
+        self.assertEqual(assignments[("source-a", "same")], "test")
+        self.assertEqual(assignments[("source-b", "same")], "test")
 
     def test_privacy_detector(self):
         flags = detect_flags("contact me user@example.com")
@@ -105,6 +107,23 @@ class ModularPipelineTests(unittest.TestCase):
         self.assertEqual([r["case_id"] for r in chosen], ["s-test-2"])
         self.assertEqual(len(audit), 1)
         self.assertEqual(quarantine, [])
+
+ 
+    def test_cross_source_conflicting_exact_inputs_are_quarantined(self):
+        base = {
+            "source": "source-a", "fingerprint": "same-fp", "task": "classification",
+            "upstream_split": "train", "upstream_row": 0, "case_id": "a-0",
+            "source_group": "incident-a", "source_group_type": "incident_id",
+            "labels": {"category": "A"}
+        }
+        other = {
+            **base, "source": "source-b", "case_id": "b-0",
+            "source_group": "incident-b", "labels": {"category": "B"}
+        }
+        chosen, audit, quarantine, stats = deduplicate_records([base, other])
+        self.assertEqual(chosen, [])
+        self.assertEqual(len(quarantine), 2)
+        self.assertEqual(audit[0]["decision"], "quarantine_all_exact_input_candidates_across_sources")
 
     def test_distinct_incidents_with_same_text_are_preserved(self):
         base = {
