@@ -139,11 +139,15 @@ def run(input_dir, output_path, manifest_path, size=150, seed=20261112, split="t
     # Exact text duplicates across sources are not independent eval examples.
     by_fingerprint = defaultdict(list)
     for record in identity_representatives:
-        by_fingerprint[record.get("fingerprint", record["case_id"])].append(record)
+        group_key = (
+            record.get("fingerprint", record["case_id"]),
+            record["task"]
+        )
+        by_fingerprint[group_key].append(record)
 
     eligible = []
     excluded_conflicts = 0
-    for fingerprint, candidates in by_fingerprint.items():
+    for (fingerprint, task), candidates in by_fingerprint.items():
         label_signatures = {
             json.dumps(r.get("labels", {}), sort_keys=True) for r in candidates
         }
