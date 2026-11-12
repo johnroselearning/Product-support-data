@@ -63,7 +63,7 @@
       "license": "cc-by-nc-4.0",
       "status": "noncommercial_only",
       "task": "support",
-      "note": "Do not include in commercial training"
+      "note": "Hugging Face distribution only: dataset card declares CC-BY-NC-4.0; 61,765-row train split with English/German and three CSV files in repository. Do not treat Kaggle's separate CC BY 4.0 listing as changing this mirror's declared license. Kaggle distribution registered separately as tobi_kaggle_multilingual; compare file/version provenance before merging."
     },
     {
       "id": "itbench",
@@ -107,6 +107,41 @@
       "adapter": "planning2interaction",
       "task": "tool_recovery_trajectories",
       "note": "General multi-turn function-call recovery data; not IT-specific; verify license and schema."
+    },
+    {
+      "id": "suraj520",
+      "source_type": "kaggle",
+      "url": "https://www.kaggle.com/datasets/suraj520/customer-support-ticket-dataset",
+      "license": "cc0-1.0",
+      "status": "review_required",
+      "task": "ticket_classification_priority_resolution_analytics",
+      "observed_rows": 8469,
+      "observed_columns": 17,
+      "observed_file": "customer_support_tickets.csv",
+      "observed_size": "3.95 MB",
+      "note": "Kaggle data card displays CC0 1.0. Preview shows customer name/email/age/gender, product, purchase date, ticket type/subject/description/status/resolution/priority/channel/response times/satisfaction. Descriptions include unresolved {product_purchased} placeholders and templated boilerplate; privacy and semantic label quality require full local audit. Do not enable yet."
+    },
+    {
+      "id": "waseem_alastal",
+      "source_type": "kaggle",
+      "url": "https://www.kaggle.com/datasets/waseemalastal/customer-support-ticket-dataset",
+      "license": "dbcl-1.0_listing_only_odbl_relationship_unverified",
+      "status": "duplicate_candidate",
+      "task": "ticket_classification_priority_resolution_analytics",
+      "observed_rows": 8469,
+      "observed_columns": 17,
+      "observed_file": "customer_support_tickets.csv",
+      "observed_size": "3.95 MB",
+      "note": "Kaggle page displays Database Contents License (DbCL) 1.0. Preview has same row count, column count, file size and matching first sample rows as Suraj520; likely re-upload/mirror, not independently confirmed byte-identical. DbCL requires compliance with ODbL and does not itself settle database rights; Kaggle page did not expose a clear companion ODbL notice. Do not ingest separately pending source/rights and hash comparison."
+    },
+    {
+      "id": "tobi_kaggle_multilingual",
+      "source_type": "kaggle",
+      "url": "https://www.kaggle.com/datasets/tobiasbueck/multilingual-customer-support-tickets",
+      "license": "cc-by-4.0_kaggle_card_claim",
+      "status": "review_required",
+      "task": "ticket_routing_priority_multilingual_response",
+      "note": "Kaggle data card displays CC BY 4.0 and says data is synthetically generated; page describes EN/DE/ES/FR/PT and fields subject/body/answer/type/queue/priority/language/business type/tags. Actual Kaggle file list, current version schema and row-level language distribution still require local download inspection. Keep distinct from the Hugging Face mirror, whose card declares CC-BY-NC-4.0."
     }
   ]
 }
