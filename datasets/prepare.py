@@ -113,7 +113,7 @@ def main():
                 if upstream == "test":
                     split = "test"
                 elif src["id"] == "it_support":
-                    split = "validation" if split_for(key) != "train" else "train"
+                    split = "validation" if split_for(rec["fingerprint"]) != "train" else "train"
                 else:
                     split = split_for(digest(src["id"] + ":" + rec["source_group"]))
                 master[split].append(rec)
