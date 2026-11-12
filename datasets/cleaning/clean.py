@@ -148,6 +148,7 @@ def run(input_dir, output_dir, allow_regex_only=False):
                 key = (
                     cleaned["source"],
                     cleaned["fingerprint"],
+                    cleaned["task"],
                     cleaned.get("source_group", "unknown")
                 )
                 if key in seen:
