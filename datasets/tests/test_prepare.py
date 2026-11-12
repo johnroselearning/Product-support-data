@@ -19,7 +19,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(row["evidence"], [])
     def test_helpdesk_priority(self):
         row = module.normalize("helpdesk", {"issue_id":"ISS-1","text":"Login failed","issue_priority":"High"}, {}, "train", 0)
-        self.assertEqual(row["source_group"], "ISS-1")
+        self.assertEqual(row["source_group"], "train:ISS-1")
         self.assertEqual(row["labels"], {"priority_source": "High"})
         self.assertNotIn("category", row["labels"])
     def test_sft(self):
