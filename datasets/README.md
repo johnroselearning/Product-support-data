@@ -1,28 +1,30 @@
-# Phase 1: dataset foundation
+# Phase 1: modular dataset foundation
 
-This repository stores reproducible ingestion code, not raw support tickets. Review the source license, attribution and privacy obligations before commercial use or redistribution.
+## Pipeline
+1. `downloaders/huggingface.py` downloads/loads each enabled Hugging Face dataset and persists an unmodified DatasetDict snapshot under `datasets/raw/<source>/`.
+2. `adapters/` maps each supported source row into the canonical master schema.
+3. `quality/privacy.py` flags obvious emails, phone numbers and secret-like strings for quarantine. This is heuristic screening, not anonymization.
+4. `splitting/group_split.py` assigns whole source groups; publisher test groups remain held out. Exact duplicate text prefers the publisher test copy.
+5. `normalization/sft.py` converts supported task labels into conversational SFT records.
+6. `exporters/jsonl.py` writes master and SFT JSONL outputs.
+7. `validate.py` checks the exported master records.
 
-## Setup
-
+## Run locally
 ```bash
-python -m venv .venv
-source .venv/bin/activate
 pip install -r datasets/requirements.txt
 python -m unittest discover -s datasets/tests -v
-python datasets/prepare.py
-# Include conversational data only after license review:
-python datasets/prepare.py --include-bitext
-```
-
-Outputs under `datasets/generated/` are ignored by Git. `master/` retains provenance and unknown investigation fields; `sft/` contains conversational fine-tuning examples; `manifest.json` reports counts. Suspicious PII is excluded and counted, not considered fully anonymized. A human privacy review is still required. Publisher test partitions are held out; exact duplicates are removed, but semantic and incident-level leakage checks remain necessary.
-
-Source labels must not be confused with verified root causes, priorities or resolutions. The Bitext corpus is conversational customer service, not evidence of correct technical investigations.
-
-## Verify generated data
-
-```bash
 python datasets/prepare.py
 python datasets/validate.py
 ```
 
-Validation checks canonical required fields, empty ticket descriptions, missing labels, duplicate IDs and fingerprints, and source-group leakage between splits. It does not certify semantic quality or absence of sensitive data. The helpdesk source uses its documented default configuration, not a separate `reporter_messages` config argument.
+## Output
+- `datasets/raw/<source>/`: downloaded, source-level Hugging Face snapshot (ignored by Git).
+- `datasets/cache/`: Hugging Face cache (ignored by Git).
+- `datasets/generated/master/{train,validation,test}.jsonl`: canonical records.
+- `datasets/generated/sft/{train,validation,test}.jsonl`: SFT messages.
+- `datasets/generated/quarantine.jsonl`: privacy-flagged records.
+- `datasets/generated/manifest.json`: source and count report.
+
+Use `--force-download` to refresh source snapshots. Use `--include-bitext` only after reviewing its license obligations. Only sources with status `enabled` are downloaded by default. Raw snapshots and generated outputs are not committed.
+
+Source revisions default to `main`; for reproducible releases, pin each source to a commit SHA in `sources.json`. Verify commercial-use and redistribution rights before use. The current source registry is a candidate inventory, not a legal opinion.
