@@ -3,8 +3,8 @@
 ## Pipeline
 1. `downloaders/huggingface.py` downloads/loads each enabled Hugging Face dataset and persists an unmodified DatasetDict snapshot under `datasets/raw/<source>/`.
 2. `adapters/` maps each supported source row into the canonical master schema.
-3. `quality/privacy.py` flags obvious emails, phone numbers and secret-like strings for quarantine. This is heuristic screening, not anonymization.
-4. `splitting/group_split.py` assigns whole source groups; publisher test groups remain held out. Exact duplicate text prefers the publisher test copy.
+3. `quality/privacy.py` redacts supported PII patterns and detected English person/location/facility entities before canonical export. This is automated screening, not guaranteed anonymization.
+4. `splitting/group_split.py` assigns identical text to one split across sources; publisher test examples remain held out. Repeats are collapsed within the same source identity, distinct incident IDs are preserved, and conflicting labels for identical task inputs are quarantined.
 5. `normalization/sft.py` converts supported task labels into conversational SFT records.
 6. `exporters/jsonl.py` writes master and SFT JSONL outputs.
 7. `validate.py` checks the exported master records.
@@ -12,6 +12,7 @@
 ## Run locally
 ```bash
 pip install -r datasets/requirements.txt
+python -m spacy download en_core_web_sm
 python -m unittest discover -s datasets/tests -v
 python datasets/prepare.py
 python datasets/validate.py
@@ -21,7 +22,7 @@ python datasets/validate.py
 - `datasets/raw/<source>/`: downloaded, source-level Hugging Face snapshot (ignored by Git).
 - `datasets/cache/`: Hugging Face cache (ignored by Git).
 - `datasets/generated/master/{train,validation,test}.jsonl`: canonical records.
-- `datasets/generated/sft/{train,validation,test}.jsonl`: SFT messages.
+- `datasets/generated/sft/{train,validation}.jsonl`: SFT messages; test records are never exported as SFT.
 - `datasets/generated/quarantine.jsonl`: privacy-flagged records.
 - `datasets/generated/manifest.json`: source and count report.
 
@@ -35,7 +36,7 @@ After ingestion and validation, run `python datasets/eda.py`. It reads only norm
 
 ## Conservative cleaning
 
-After reviewing EDA, run `python datasets/cleaning/clean.py`. It reads normalized master records and writes a separate `datasets/cleaned/` output plus `cleaning_report.json` and `quarantine.jsonl`. It only normalizes line endings, removes NUL bytes, trims edge whitespace, checks required labels, rechecks obvious PII, and removes exact duplicates created by safe normalization. It preserves label identity and does not delete records for unusual text length. It never modifies raw snapshots or normalized master files. Validate the cleaned output with `python datasets/validate.py --input datasets/cleaned`.
+After reviewing EDA, run `python datasets/cleaning/clean.py`. It reads normalized master records and writes a separate `datasets/cleaned/` output plus `cleaning_report.json` and `quarantine.jsonl`. It normalizes line endings, removes NUL bytes, trims edge whitespace, redacts detected PII, checks required labels, and collapses exact repeats only within the same source incident identity. It preserves label identity and does not delete records for unusual text length. It never modifies raw snapshots or normalized master files. Validate the cleaned output with `python datasets/validate.py --input datasets/cleaned`.
 
 ## Consolidated quality report and capability gaps
 
@@ -68,7 +69,7 @@ pip install -r datasets/requirements.txt
 python -m spacy download en_core_web_sm
 ```
 
-The default pipeline fails closed if the NER model is unavailable. The explicit --allow-regex-only option is for controlled local testing only and marks output as not production-ready. Regex and NER screening are not a guarantee of anonymization; manually review samples and quarantine uncertain records. Raw source snapshots remain unmodified under datasets/raw and must be access-controlled and excluded from Git.
+The default pipeline fails closed if the English NER model is unavailable. This NER model is English-only; multilingual sources need language-specific PII detection before ingestion. The explicit --allow-regex-only option is for controlled local testing only and marks output as not production-ready. Regex and NER screening are not a guarantee of anonymization; manually review samples and quarantine uncertain records. Raw source snapshots remain unmodified under datasets/raw and must be access-controlled and excluded from Git.
 
 Incident identifiers are hashed before canonical export. Exact-text groups are assigned to a single split. Repeated text is collapsed only within the same source identity; different incident IDs are preserved. If identical model inputs have conflicting labels, all candidates are quarantined because the current input schema cannot disambiguate them.
 
@@ -93,7 +94,7 @@ Never train on test records or on the evaluation review queue.
 
 ## Human-reviewed evaluation framework
 
-See evaluation/README.md. Generate a 150-case stratified review queue from the cleaned test split:
+See evaluation/README.md. Generate a 150-case stratified review queue from the cleaned test split; generate a separate dev queue from validation using --split validation:
 
 ```bash
 python datasets/evaluation/sample_eval.py --size 150 --seed 20261112
