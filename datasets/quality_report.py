@@ -36,6 +36,11 @@ def run(root, out):
     lengths=sorted(len(r["ticket"]["description"]) for r in records)
     def percentile(p):
         return lengths[min(len(lengths)-1,round((len(lengths)-1)*p))] if lengths else None
+    near_duplicate_path = out / "near_duplicate_summary.json"
+    near_duplicate_summary = (
+      json.loads(near_duplicate_path.read_text())
+      if near_duplicate_path.exists() else None
+    )
     capability={
       "ticket_classification":"partially_supported: IT Support category labels",
       "priority_classification":"partially_supported: Help Desk source priority labels",
@@ -64,6 +69,7 @@ def run(root, out):
         "cleaning_reasons":dict(Counter(reason for r in clean_quarantine for reason in r.get("reasons",[])))},
       "text_length_chars":{"min":min(lengths) if lengths else None,"median":percentile(.5),
         "p95":percentile(.95),"max":max(lengths) if lengths else None},
+      "near_duplicate_review":near_duplicate_summary,
       "capability_coverage":capability,
       "recommendations":[
         "Manually review duplicate label conflicts before deciding whether any candidate label is valid.",
@@ -92,6 +98,7 @@ def run(root, out):
       "- Conflicting-label groups: "+str(len(conflicts)),
       "- Conflicting-label candidate records quarantined: "+str(conflict_record_count),
       "- Privacy-flagged records quarantined: "+str(privacy_count),
+      "- Near-duplicate candidate pairs (human review only): "+str((near_duplicate_summary or {}).get("near_duplicate_pairs", "not run")),
       "- Cleaning quarantine records: "+str(len(clean_quarantine)),"","## Capability coverage",""]
     lines += ["- **"+k.replace("_"," ").title()+"**: "+v for k,v in capability.items()]
     lines += ["","## Recommended next data acquisition","",
