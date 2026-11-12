@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+datasets/generated/
+datasets/cache/
+*.jsonl
+*.parquet
+.env
