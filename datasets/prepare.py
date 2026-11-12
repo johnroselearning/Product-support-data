@@ -3,12 +3,12 @@ import argparse
 import json
 from collections import Counter
 from pathlib import Path
-from datasets.downloaders.huggingface import download_source
-from datasets.adapters.registry import get_adapter
-from datasets.quality.privacy import detect_flags
-from datasets.splitting.group_split import assign_records
-from datasets.normalization.sft import to_sft
-from datasets.exporters.jsonl import write_jsonl
+from downloaders.huggingface import download_source
+from adapters.registry import get_adapter
+from quality.privacy import detect_flags
+from splitting.group_split import assign_records
+from normalization.sft import to_sft
+from exporters.jsonl import write_jsonl
 
 ROOT = Path(__file__).resolve().parent
 
