@@ -2,51 +2,71 @@
 
 ## What is implemented
 
-- A JSON Schema for task-specific support-agent evaluation cases.
-- A deterministic stratified sampler that selects from the cleaned, held-out test split.
-- A human-review queue with source labels prefilled but explicitly unverified.
-- A deterministic evaluator for approved classification labels, answerability, required/forbidden facts and expected tools.
-- A judge rubric and human review guide.
+- JSON Schema for task-specific support-agent evaluation cases.
+- Deterministic stratified sampling from either the cleaned validation split (dev queue) or held-out test split (final evaluation queue).
+- Human-review queues with source labels prefilled but explicitly unverified.
+- Immutable promotion of approved queues into versioned dev/evaluation files with SHA-256 manifests.
+- Deterministic evaluator for approved classification labels, answerability, required/forbidden facts and expected tools.
+- Judge rubric and human review guide.
 
-## Generate a 150-case review queue
+## Generate review queues
 
-Run after ingestion and cleaning:
+Run after ingestion and cleaning.
 
-\`\`\`bash
-python datasets/evaluation/sample_eval.py --size 150 --seed 20261112
-\`\`\`
+Final evaluation candidates (held-out test split):
 
-Outputs:
-- review_queue_v1.jsonl: pending cases for human annotation.
-- review_queue_manifest.json: counts, strata, seed and provenance.
+```bash
+python datasets/evaluation/sample_eval.py --split test --size 150 --seed 20261112
+```
 
-This queue is not an evaluation benchmark until each case is reviewed. The sampler uses only cleaned/master/test.jsonl, stratifies by task and source label, removes cross-source exact-text repeats, and excludes exact-text groups with conflicting labels. It does not fabricate root causes, resolutions, expected tools or answerability.
+Development candidates (validation split):
 
-## Approve and release a benchmark
+```bash
+python datasets/evaluation/sample_eval.py --split validation --size 100 --seed 20261112 --output datasets/evaluation/dev_review_queue_v1.jsonl --manifest datasets/evaluation/dev_review_queue_manifest.json
+```
 
-Follow REVIEW_GUIDE.md. Copy only fully reviewed and approved cases into eval_v1.jsonl. Keep the released file read-only and record its SHA-256 checksum. Use dev_v1.jsonl for prompt/model iteration; do not tune against eval_v1.jsonl.
+The default output for the test split is review_queue_v1.jsonl. The sampler stratifies by task and source label, removes cross-source exact-text repeats and excludes exact-text groups with conflicting labels. It does not invent root causes, resolutions, expected tools or answerability.
+
+The generated files are review queues, not approved gold datasets. Source labels are prefilled but remain unverified until a human reviewer approves each case.
+
+## Review and promote
+
+Follow REVIEW_GUIDE.md. After every applicable field has been reviewed, set review.status to approved, provide reviewer and reviewed_at, and complete evidence-backed gold fields. Rejected cases must remain excluded.
+
+Promote a development queue:
+
+```bash
+python datasets/evaluation/promote_eval.py --input datasets/evaluation/dev_review_queue_v1.jsonl --output datasets/evaluation/dev_v1.jsonl --manifest datasets/evaluation/dev_v1_manifest.json --split validation
+```
+
+Promote the final test queue:
+
+```bash
+python datasets/evaluation/promote_eval.py --input datasets/evaluation/review_queue_v1.jsonl --output datasets/evaluation/eval_v1.jsonl --manifest datasets/evaluation/eval_v1_manifest.json --split test
+```
+
+Promotion refuses pending/rejected cases, missing reviewer metadata, empty gold labels, or a mismatched source split. Output files are created exclusively: an existing version is never overwritten. The manifest records the SHA-256 checksum. Create a new version filename for any new release.
+
+Use dev_v1.jsonl for prompt/model iteration. Never tune prompts, retrieval or models against eval_v1.jsonl.
 
 ## Run deterministic evaluation
 
 Prediction JSONL format:
 
-\`\`\`json
+```json
 {"case_id":"source-test-12-abcd1234","labels":{"category":"Software"},"answerable":true,"answer":"...","tool_calls":["search_logs"]}
-\`\`\`
+```
 
 Run:
 
-\`\`\`bash
-python datasets/evaluation/evaluate.py \\
-  --gold datasets/evaluation/eval_v1.jsonl \\
-  --predictions predictions.jsonl \\
-  --output datasets/evaluation/reports/eval_v1_summary.json
-\`\`\`
+```bash
+python datasets/evaluation/evaluate.py --gold datasets/evaluation/eval_v1.jsonl --predictions predictions.jsonl --output datasets/evaluation/reports/eval_v1_summary.json
+```
 
-The evaluator refuses pending/rejected gold cases and fails on missing or extra predictions. It reports label exact match, per-class precision/recall/F1, macro F1, answerability, required/forbidden fact checks and expected-tool precision/recall/F1 where those gold fields exist.
+The evaluator refuses pending/rejected gold cases and fails on missing or extra predictions. It reports label exact match, per-class precision/recall/F1, macro F1, answerability, required/forbidden fact checks and expected-tool precision/recall/F1 where those gold fields exist. It refuses to mix validation and test cases in one run.
 
-Phrase checks are deterministic substring checks, not semantic equivalence. Use the judge rubric for reviewed qualitative assessment; calibrate against at least 20–30 human-scored cases before trusting an LLM judge.
+Phrase checks use normalized substring matching, not semantic equivalence. Tool scoring compares tool names only; query and argument correctness need separate review. Use JUDGE_RUBRIC.md for qualitative assessment and calibrate an LLM judge against at least 20–30 human-scored cases before trusting it.
 
 ## Data safety
 
-Evaluation JSONL files and reports are ignored by Git by default. Do not commit raw or personal data. Store only redacted, reviewed cases in an access-controlled location. The review queue may be shared as a private GitHub Actions artifact for authorized repository users.
+Evaluation JSONL files and reports are ignored by Git by default. Do not commit raw or personal data. Store only redacted, reviewed cases in an access-controlled location. The pending test review queue may be shared as a private GitHub Actions artifact for authorized repository users.
