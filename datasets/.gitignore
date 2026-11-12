@@ -11,3 +11,8 @@ cleaned/
 quality_report/
 
 research/customer_support_csv_profile.json
+
+evaluation/review_queue_manifest.json
+evaluation/reports/
+evaluation/eval_v1.jsonl
+evaluation/dev_v1.jsonl
