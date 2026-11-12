@@ -71,6 +71,8 @@ python -m spacy download en_core_web_sm
 
 The default pipeline fails closed if the English NER model is unavailable. This NER model is English-only; multilingual sources need language-specific PII detection before ingestion. The explicit --allow-regex-only option is for controlled local testing only and marks output as not production-ready. Regex and NER screening are not a guarantee of anonymization; manually review samples and quarantine uncertain records. Raw source snapshots remain unmodified under datasets/raw and must be access-controlled and excluded from Git.
 
+For sources with structured PII columns (for example customer name, email, phone, address or account fields), adapters must use an explicit field allowlist and must not copy those columns into the canonical record. The text redactor does not sanitize arbitrary structured columns that an adapter chooses to export.
+
 Incident identifiers are hashed before canonical export. Exact-text groups are assigned to a single split. Repeated text is collapsed only within the same source identity; different incident IDs are preserved. If identical model inputs have conflicting labels, all candidates are quarantined because the current input schema cannot disambiguate them.
 
 Near-duplicate candidates are generated for human review; they are never automatically deleted:
