@@ -46,7 +46,7 @@ def validate(root, allow_regex_only=False):
                     if rec["root_cause"] != "unknown" or rec["resolution"] != "unknown":
                         raise ValueError("unverified outcomes in canonical record")
 
-                    pii_flags = detect_flags(description)
+                    pii_flags = detect_flags(description, use_ner=not allow_regex_only)
                     if pii_flags:
                         raise ValueError("unredacted PII categories: " + ",".join(pii_flags))
 
