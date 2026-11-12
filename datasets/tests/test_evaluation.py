@@ -11,6 +11,7 @@ class EvaluationTests(unittest.TestCase):
         return {
             "case_id": case_id,
             "task": "classification",
+            "provenance": {"source_split": "test"},
             "gold": {
                 "labels": {"category": label},
                 "answerable": True,
