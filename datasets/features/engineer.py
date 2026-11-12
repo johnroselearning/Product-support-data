@@ -621,13 +621,20 @@ def read_records(input_dir):
                         and not DATE_NAME_RE.search(key)
                         and not re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)%?", value)
                     )
-                    privacy_text = "\n".join([
+                    # privacy_text = "\n".join([
+                    #     _text(record),
+                    #     " ".join(str(value) for value in record.get("labels", {}).values()),
+                    #     safe_attribute_text,
+                    # ])
+                    privacy_fields = [
                         _text(record),
-                        " ".join(str(value) for value in record.get("labels", {}).values()),
+                        *(str(value) for value in record.get("labels", {}).values()),
                         safe_attribute_text,
-                    ])
-                    if detect_flags(privacy_text):
-                        raise ValueError(f"Refusing record with a privacy pattern at {path}:{line_number}")
+                    ]
+                    if any(detect_flags(value) for value in privacy_fields):
+                        raise ValueError(f"Refusing record with a privacy pattern at {path}:{line_number}")   
+                    # if detect_flags(privacy_text):
+                    #     raise ValueError(f"Refusing record with a privacy pattern at {path}:{line_number}")
                     records.append(record)
         splits[split] = records
     return splits
