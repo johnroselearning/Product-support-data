@@ -12,7 +12,7 @@ def build_record(source, upstream_split, row_index, text, task, labels, source_g
     fingerprint = digest(text)
     return {
         "schema_version": "1.2",
-        "case_id": f"{source['id']}-{fingerprint[:16]}",
+        "case_id": f"{source['id']}-{upstream_split}-{row_index}-{fingerprint[:12]}",
         "source": source["id"],
         "source_revision": source.get("revision", "main"),
         "license": source["license"],
