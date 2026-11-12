@@ -55,3 +55,56 @@ python datasets/research/profile_customer_support_csvs.py \
 ```
 
 The script records file SHA-256 hashes, schema, missingness, duplicates, label distributions, text-template indicators, and text/label conflict counts. It writes aggregate output to `datasets/research/customer_support_csv_profile.json`, which is gitignored. It does not certify privacy or semantic correctness.
+
+
+## Privacy protection and identity-aware deduplication
+
+The canonical pipeline now redacts detected emails, phone numbers, secrets, cloud/API tokens, labelled account identifiers, IP addresses and detected person/location/facility entities before writing canonical records. Person/location detection uses spaCy's en_core_web_sm model.
+
+Install and load the model before local ingestion:
+
+```bash
+pip install -r datasets/requirements.txt
+python -m spacy download en_core_web_sm
+```
+
+The default pipeline fails closed if the NER model is unavailable. The explicit --allow-regex-only option is for controlled local testing only and marks output as not production-ready. Regex and NER screening are not a guarantee of anonymization; manually review samples and quarantine uncertain records. Raw source snapshots remain unmodified under datasets/raw and must be access-controlled and excluded from Git.
+
+Incident identifiers are hashed before canonical export. Exact-text groups are assigned to a single split. Repeated text is collapsed only within the same source identity; different incident IDs are preserved. If identical model inputs have conflicting labels, all candidates are quarantined because the current input schema cannot disambiguate them.
+
+Near-duplicate candidates are generated for human review; they are never automatically deleted:
+
+```bash
+python datasets/quality/near_duplicates.py
+```
+
+The report is written under datasets/quality_report. A similarity score is not proof of incident identity.
+
+## Training/evaluation leakage prevention
+
+SFT exports now contain only train and validation records. The held-out test split remains in master JSONL for evaluation sampling and is not exported as SFT. The pipeline removes a stale SFT test file from older runs when regenerated.
+
+Use:
+- generated or cleaned SFT train for fine-tuning.
+- validation for model/prompt iteration.
+- the held-out test split only for evaluation review and final benchmark creation.
+
+Never train on test records or on the evaluation review queue.
+
+## Human-reviewed evaluation framework
+
+See evaluation/README.md. Generate a 150-case stratified review queue from the cleaned test split:
+
+```bash
+python datasets/evaluation/sample_eval.py --size 150 --seed 20261112
+```
+
+This creates pending cases, not gold answers. Existing source labels are prefilled but unverified. Root causes, resolutions, expected tools, must-include facts and answerability remain blank until human review. Only approved cases may be copied into a versioned eval_v1.jsonl. Use a separate dev set for tuning.
+
+The deterministic evaluator accepts approved gold cases and model predictions:
+
+```bash
+python datasets/evaluation/evaluate.py --gold datasets/evaluation/eval_v1.jsonl --predictions predictions.jsonl --output datasets/evaluation/reports/eval_v1_summary.json
+```
+
+The evaluator reports label metrics, answerability, required/forbidden fact checks and expected-tool metrics where reviewed gold fields exist. LLM judging is advisory and must be calibrated against at least 20–30 human-reviewed cases using evaluation/JUDGE_RUBRIC.md.
