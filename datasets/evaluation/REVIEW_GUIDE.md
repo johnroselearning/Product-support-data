@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The generated review_queue_v1.jsonl is a queue of held-out source test examples. It is NOT an approved gold evaluation set. Source labels are prefilled for convenience and must be checked against the ticket.
+The generated review queue is sampled either from the validation split for dev_v1 or from the held-out test split for eval_v1. It is NOT an approved gold evaluation set. Source labels are prefilled for convenience and must be checked against the ticket.
 
 ## Review workflow
 
@@ -21,10 +21,12 @@ For each case:
 
 ## Evaluation split rules
 
-- Sample only from the held-out source test split.
+- Sample dev cases only from the source validation split.
+- Sample final evaluation cases only from the held-out source test split.
 - Never copy review-queue cases into training or fine-tuning data.
 - Keep review_queue_v1.jsonl pending until human review is complete.
-- Promote only approved cases to a separately versioned eval_v1.jsonl.
+- Promote approved validation cases to dev_v1.jsonl.
+- Promote approved test cases to eval_v1.jsonl using promote_eval.py; promotion creates immutable files and SHA-256 manifests.
 - Do not tune prompts, retrieval or models against the final test set. Use a separate dev set for iteration.
 - Store a checksum and reviewer metadata for each released evaluation version.
 
