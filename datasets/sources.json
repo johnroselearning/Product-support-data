@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "it_support",
+      "repo": "tasksource/it-support-tickets",
+      "license": "CC-BY-4.0",
+      "enabled": true,
+      "task": "classification",
+      "url": "https://huggingface.co/datasets/tasksource/it-support-tickets"
+    },
+    {
+      "id": "bitext",
+      "repo": "bitext/Bitext-customer-support-llm-chatbot-training-dataset",
+      "license": "CDLA-Sharing-1.0",
+      "enabled": false,
+      "task": "response",
+      "url": "https://huggingface.co/datasets/bitext/Bitext-customer-support-llm-chatbot-training-dataset",
+      "note": "Opt in only after license review"
+    }
+  ]
+}
