@@ -1,22 +1,75 @@
 {
-  "version": 1,
+  "version": 2,
+  "policy": "Registration does not imply permission for commercial model training or redistribution. Verify licenses and source revision before enabling.",
   "sources": [
     {
       "id": "it_support",
       "repo": "tasksource/it-support-tickets",
-      "license": "CC-BY-4.0",
-      "enabled": true,
+      "license": "cc-by-4.0",
+      "status": "enabled",
+      "adapter": "it_support",
       "task": "classification",
-      "url": "https://huggingface.co/datasets/tasksource/it-support-tickets"
+      "attribution": "Leonardo Santiago Benitez Pereira (2022), doi:10.5281/zenodo.7648117"
+    },
+    {
+      "id": "polaris",
+      "repo": "VladislavMarinovich/polaris-support-tickets-v2",
+      "license": "cc-by-sa-4.0",
+      "status": "review_required",
+      "adapter": "polaris",
+      "task": "synthetic_triage",
+      "note": "Share-alike terms; fictional SaaS; event grouping required"
+    },
+    {
+      "id": "glaive",
+      "repo": "glaiveai/glaive-function-calling",
+      "license": "apache-2.0",
+      "status": "review_required",
+      "adapter": "glaive",
+      "task": "tool_calling",
+      "note": "Raw transcripts need a dedicated role/function-call parser; do not train as plain text"
+    },
+    {
+      "id": "swe_extra",
+      "repo": "nebius/SWE-bench-extra",
+      "license": "cc-by-4.0 plus per-repository licenses",
+      "status": "review_required",
+      "adapter": "swe_extra",
+      "task": "software_issue",
+      "note": "Per-instance repository license; preserve instance and repository group; do not train on held-out evaluation cases"
     },
     {
       "id": "bitext",
       "repo": "bitext/Bitext-customer-support-llm-chatbot-training-dataset",
-      "license": "CDLA-Sharing-1.0",
-      "enabled": false,
+      "license": "cdla-sharing-1.0",
+      "status": "review_required",
+      "adapter": "bitext",
       "task": "response",
-      "url": "https://huggingface.co/datasets/bitext/Bitext-customer-support-llm-chatbot-training-dataset",
-      "note": "Opt in only after license review"
+      "note": "Check license obligations and commercial usage"
+    },
+    {
+      "id": "tobi",
+      "repo": "Tobi-Bueck/customer-support-tickets",
+      "license": "cc-by-nc-4.0",
+      "status": "noncommercial_only",
+      "task": "support",
+      "note": "Do not include in commercial training"
+    },
+    {
+      "id": "itbench",
+      "repo": "ibm-research/ITBench-Trajectories",
+      "license": "cc-by-nc-4.0",
+      "status": "noncommercial_only",
+      "task": "investigation",
+      "note": "Noncommercial only; nested traces need dedicated ingestion"
+    },
+    {
+      "id": "loghub",
+      "url": "https://github.com/logpai/loghub",
+      "license": "review_required",
+      "status": "review_required",
+      "task": "log_analysis",
+      "note": "Repository includes multiple corpora; verify individual dataset rights and provenance"
     }
   ]
 }
