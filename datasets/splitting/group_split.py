@@ -1,22 +1,27 @@
 import hashlib
 
-def assign_group(source_id, group_id):
-    digest = hashlib.sha256(f"{source_id}:{group_id}".encode()).hexdigest()
+def assign_group(group_id):
+    digest = hashlib.sha256(f"exact-text:{group_id}".encode()).hexdigest()
     bucket = int(digest[:8], 16) % 100
     return "train" if bucket < 80 else "validation" if bucket < 90 else "test"
 
+
 def _split_group(record):
-    return record.get("split_group") or record["source_group"]
+    return record.get("split_group") or record["fingerprint"]
+
 
 def assign_records(records):
-    """Assign exact-text groups together; publisher test groups remain held out."""
+    """Keep identical model inputs together across all sources and upstream splits."""
     forced_test = {
-        (r["source"], _split_group(r))
-        for r in records if r["upstream_split"] == "test"
+        _split_group(record)
+        for record in records
+        if record["upstream_split"] == "test"
     }
     return {
-        (r["source"], _split_group(r)):
-        ("test" if (r["source"], _split_group(r)) in forced_test
-         else assign_group(r["source"], _split_group(r)))
-        for r in records
+        (record["source"], _split_group(record)):
+        (
+            "test" if _split_group(record) in forced_test
+            else assign_group(_split_group(record))
+        )
+        for record in records
     }
