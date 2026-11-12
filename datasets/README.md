@@ -23,7 +23,7 @@ python datasets/validate.py
 - `datasets/cache/`: Hugging Face cache (ignored by Git).
 - `datasets/generated/master/{train,validation,test}.jsonl`: canonical records.
 - `datasets/generated/sft/{train,validation}.jsonl`: SFT messages; test records are never exported as SFT.
-- `datasets/generated/quarantine.jsonl`: privacy-flagged records.
+- `datasets/generated/quarantine.jsonl`: records with sensitive labels or conflicting exact-input labels; raw sensitive values are not copied into quarantine.
 - `datasets/generated/manifest.json`: source and count report.
 
 Use `--force-download` to refresh source snapshots. Use `--include-bitext` only after reviewing its license obligations. Only sources with status `enabled` are downloaded by default. Raw snapshots and generated outputs are not committed.
