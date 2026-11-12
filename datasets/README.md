@@ -79,6 +79,16 @@ python datasets/research/profile_customer_support_csvs.py \
 The script records file SHA-256 hashes, schema, missingness, duplicates, label distributions, text-template indicators, and text/label conflict counts. It writes aggregate output to `datasets/research/customer_support_csv_profile.json`, which is gitignored. It does not certify privacy or semantic correctness.
 
 
+## Statistical EDA and optional feature engineering
+
+The EDA summary includes central tendency, spread, distribution shape, and Pearson/Spearman/Kendall correlation for text-length measures. See datasets/FEATURE_ENGINEERING.md for the full scope.
+
+For a classical classification baseline, run the separate feature exporter against cleaned records:
+
+    python datasets/feature_engineering.py --label-key category
+    python datasets/feature_engineering.py --label-key priority_source
+
+This produces train/validation/test matrices without changing master or SFT records. Transformations fit on train only. Feature generation is optional; TF-IDF and numeric engineering are not needed for the SFT path. No timestamp or embedding model is present in the current canonical schema; see the feature-engineering guide for those limits and supported options. Generated matrices and the saved preprocessor are gitignored.
 ## Privacy protection and identity-aware deduplication
 
 The canonical pipeline now redacts detected emails, phone numbers, secrets, cloud/API tokens, labelled account identifiers, IP addresses and detected person/location/facility entities before writing canonical records. Person/location detection uses spaCy's en_core_web_sm model.
