@@ -7,7 +7,7 @@ from pathlib import Path
 
 try:
     from .validation import load_validator, require_valid_case
-except ImportError:  # Support direct execution: python datasets/evaluation/evaluate.py
+except ImportError:  # Support direct execution: python datasets/evaluation/promote_eval.py
     from validation import load_validator, require_valid_case
 
 
