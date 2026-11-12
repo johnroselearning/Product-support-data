@@ -28,6 +28,22 @@ class ModularPipelineTests(unittest.TestCase):
         self.assertEqual(assignments[("source-a", "same")], "test")
         self.assertEqual(assignments[("source-b", "same")], "test")
 
+
+    def test_all_messages_from_same_incident_stay_in_one_split(self):
+        rows = [
+            {"source": "helpdesk", "source_group": "issue-hash",
+             "source_group_type": "incident_id", "split_group": "fp-1",
+             "upstream_split": "train"},
+            {"source": "helpdesk", "source_group": "issue-hash",
+             "source_group_type": "incident_id", "split_group": "fp-2",
+             "upstream_split": "validation"}
+        ]
+        assignments = assign_records(rows)
+        self.assertEqual(
+            assignments[("helpdesk", "fp-1")],
+            assignments[("helpdesk", "fp-2")]
+        )
+
     def test_privacy_detector(self):
         flags = detect_flags("contact me user@example.com")
         self.assertIn("email", flags)
