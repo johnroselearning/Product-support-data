@@ -51,7 +51,7 @@ def deduplicate_records(records):
                 "task": task,
                 "sources": sorted({r["source"] for r in candidates}),
                 "label_conflict": True,
-                "decision": "quarantine_all_exact_input_candidates_across_sources",
+                "decision": "quarantine_all_exact_input_candidates_conflicting_labels",
                 "candidate_count": len(candidates),
                 "candidates": [{
                     "case_id": r["case_id"],
