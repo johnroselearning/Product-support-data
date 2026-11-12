@@ -69,4 +69,4 @@ Phrase checks use normalized substring matching, not semantic equivalence. Tool 
 
 ## Data safety
 
-Evaluation JSONL files and reports are ignored by Git by default. Do not commit raw or personal data. Store only redacted, reviewed cases in an access-controlled location. The pending test review queue may be shared as a private GitHub Actions artifact for authorized repository users.
+Evaluation JSONL files and reports are ignored by Git by default. Do not commit raw or personal data. Store only redacted, reviewed cases in an access-controlled location. Review queues and gold evaluation JSONL files remain local and gitignored. CI uploads aggregate manifests and quality summaries only; it does not publish ticket text.
