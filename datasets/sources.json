@@ -12,6 +12,17 @@
       "attribution": "Leonardo Santiago Benitez Pereira (2022), doi:10.5281/zenodo.7648117"
     },
     {
+      "id": "helpdesk",
+      "repo": "tasksource/help-desk-tickets",
+      "config": "reporter_messages",
+      "license": "cc-by-4.0",
+      "status": "enabled",
+      "adapter": "helpdesk",
+      "task": "priority_label",
+      "attribution": "Mohammad Abdellatif, Help Desk Tickets, Mendeley Data v3, doi:10.17632/btm76zndnt.3",
+      "note": "357 reporter-message issues; priority is source priority, not severity; issue_id grouping"
+    },
+    {
       "id": "polaris",
       "repo": "VladislavMarinovich/polaris-support-tickets-v2",
       "license": "cc-by-sa-4.0",
