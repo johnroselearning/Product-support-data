@@ -30,7 +30,8 @@ def clean_record(record, allow_regex_only=False):
         return None, ["empty_after_trim"], {}
 
     safe_text, flags, redaction_counts = redact_text(
-        text, require_ner=not allow_regex_only
+        text, require_ner=not allow_regex_only,
+        use_ner=not allow_regex_only
     )
     safe_text = clean_text(safe_text)
     if not safe_text:
@@ -49,7 +50,8 @@ def clean_record(record, allow_regex_only=False):
             return None, ["empty_label"], redaction_counts
         label = str(value).strip()
         _, label_flags, _ = redact_text(
-            label, require_ner=not allow_regex_only
+            label, require_ner=not allow_regex_only,
+            use_ner=not allow_regex_only
         )
         if label_flags:
             return None, ["privacy_in_label"], redaction_counts
