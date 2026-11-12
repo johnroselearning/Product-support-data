@@ -31,7 +31,18 @@ Source revisions default to `main`; for reproducible releases, pin each source t
 
 ## Exploratory Data Analysis
 
-After ingestion and validation, run `python datasets/eda.py`. It reads only normalized master JSONL files and writes `datasets/eda/` with a JSON summary, CSV profiles, and PNG charts. It never edits raw snapshots or normalized records. Review label distributions, text lengths, duplicates, and privacy flags before defining cleaning rules. EDA is descriptive; it does not automatically remove or relabel records.
+After ingestion and validation, run `python datasets/eda.py`. It reads only normalized master JSONL files and writes `datasets/eda/` outputs. It never edits raw snapshots or normalized records. EDA is descriptive; it does not automatically remove or relabel records.
+
+The JSON summary includes:
+- Mean, median and mode for ticket character and word counts.
+- Sample variance and standard deviation, quartiles, IQR, p95, min/max, IQR outlier counts, skewness and Fisher excess kurtosis.
+- Pearson, Spearman and Kendall correlations between character and word counts.
+- A source-by-split contingency table and an exploratory chi-square result when expected counts are adequate.
+- Existing counts, label distributions, missing labels, text length, duplicate fingerprints, split leakage and privacy-flag summaries.
+
+Charts include source/split/label count bars; character and word histograms; box and violin plots of text lengths by source; KDE density plots; a character-versus-word scatter plot; a Pearson correlation heatmap; and a numeric pair plot.
+
+The statistical outputs are exploratory. Character and word counts come from the same text and are not independent features. The source-by-split chi-square test may also be affected by group-based split assignment; low expected counts cause the test to be skipped. Do not remove records or claim a causal relationship based only on these summaries.
 
 ## Conservative cleaning
 
