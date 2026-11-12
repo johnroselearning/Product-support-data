@@ -1,8 +1,8 @@
 """PII screening and redaction for support-ticket text.
 
 Regex coverage is supplemented by spaCy NER for person and location entities.
-The pipeline requires the en_core_web_sm model before processing production data.
-No detector guarantees complete anonymization; human review remains required.
+The production pipeline requires en_core_web_sm. No detector guarantees complete
+anonymization; human review and language-specific screening remain required.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ PATTERNS = {
         r"\s*(?:id|number|no\.?|#)\s*[:=#-]?\s*[A-Z0-9][A-Z0-9_-]{3,}\b"
     ),
     "ipv4": re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])"),
-    "ipv6": re.compile(r"(?i)(?<![\w:])(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}(?![\w:])"),
+    "ipv6": re.compile(r"(?i)(?<![\w.])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?![\w.])"),
     "street_address": re.compile(
         r"(?i)\b\d{1,6}\s+[A-Z0-9.'-]+(?:\s+[A-Z0-9.'-]+){0,5}\s+"
         r"(?:street|st|road|rd|avenue|ave|lane|ln|drive|dr|boulevard|blvd|"
@@ -51,6 +51,7 @@ def privacy_capabilities():
         "regex_screening": True,
         "person_and_location_ner": _load_ner() is not None,
         "ner_model": "en_core_web_sm",
+        "ner_language": "en"
     }
 
 
@@ -106,14 +107,14 @@ def detect_flags(text):
     return flags
 
 
-def redact_text(text, require_ner=False):
+def redact_text(text, require_ner=False, use_ner=True):
     """Redact detected spans and return (safe_text, categories, per-category counts)."""
     if not isinstance(text, str):
         raise TypeError("redact_text expects a string")
     if require_ner:
         ensure_person_ner_available()
 
-    spans, flags, counts = _collect_spans(text)
+    spans, flags, counts = _collect_spans(text, use_ner=use_ner)
     if not spans:
         return text, flags, counts
 
