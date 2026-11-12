@@ -71,8 +71,11 @@ def clean_record(record, allow_regex_only=False):
     )
 
     quality = dict(out.get("quality", {}))
-    quality["privacy_flags"] = flags
-    quality["privacy_redactions"] = redaction_counts
+    prior_flags = set(quality.get("privacy_flags", []))
+    quality["privacy_flags"] = sorted(prior_flags | set(flags))
+    prior_counts = Counter(quality.get("privacy_redactions", {}))
+    prior_counts.update(redaction_counts)
+    quality["privacy_redactions"] = dict(prior_counts)
     quality["privacy_mode"] = (
         "regex_only_not_production_ready"
         if allow_regex_only else "regex_plus_spacy_ner"
