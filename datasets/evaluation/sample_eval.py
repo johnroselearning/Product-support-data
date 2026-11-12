@@ -119,6 +119,8 @@ def build_review_case(record, stratum, seed, split):
 def run(input_dir, output_path, manifest_path, size=150, seed=20261112, split="test"):
     if split not in {"validation", "test"}:
         raise ValueError("split must be validation or test")
+    if size < 1:
+        raise ValueError("size must be at least 1")
     records = read_split_records(input_dir, split)
     # Select one deterministic representative per verified incident identity.
     by_identity = defaultdict(list)
