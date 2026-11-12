@@ -39,6 +39,9 @@ jobs:
       - name: Validate normalized records
         run: python datasets/validate.py
 
+      - name: Generate exploratory data analysis
+        run: python datasets/eda.py
+
       - name: Display ingestion report
         if: always()
         run: |
@@ -55,4 +58,5 @@ jobs:
             datasets/generated/master/
             datasets/generated/sft/
             datasets/generated/manifest.json
-          retention-days: 7
+            datasets/eda/
+          retention-days: 30
