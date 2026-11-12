@@ -20,7 +20,7 @@ def assert_safe_training_input(path, role="train"):
     parts = tuple(part.casefold() for part in relative.parts)
     name = candidate.name.casefold()
 
-    if parts.intersection({"test", "evaluation", "eval", "review_queue"}):
+    if set(parts).intersection({"test", "evaluation", "eval", "review_queue"}):
         raise ValueError("Test/evaluation data must never be used for training.")
 
     if "eval_v1" in name or "review_queue" in name or name == "test.jsonl":
