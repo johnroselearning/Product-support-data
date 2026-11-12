@@ -3,6 +3,7 @@ import argparse
 import sys
 import json
 import hashlib
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -10,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from exporters.jsonl import write_jsonl
 from quality.privacy import redact_text, ensure_person_ner_available, privacy_capabilities
 from normalization.sft import to_sft
+from adapters.common import safe_attributes
 
 SPLITS = ("train", "validation", "test")
 
@@ -20,6 +22,27 @@ def clean_text(value):
 
 def clean_record(record, allow_regex_only=False):
     out = dict(record)
+    raw_attributes = record.get("attributes", {})
+    if not isinstance(raw_attributes, dict):
+        return None, ["invalid_attributes"], {}
+    attributes = safe_attributes(raw_attributes)
+    attribute_flags = set()
+    attribute_redactions = Counter()
+    date_key = re.compile(r"(?:date|time|created|updated|opened|closed|resolved)", re.I)
+    numeric_text = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)%?$")
+    for key, value in list(attributes.items()):
+        # Keep date/time values parseable and don't treat numeric measurements as phone numbers.
+        if isinstance(value, str) and not date_key.search(key) and not numeric_text.fullmatch(value):
+            safe_value, flags, counts = redact_text(
+                value, require_ner=not allow_regex_only,
+                use_ner=not allow_regex_only
+            )
+            attributes[key] = clean_text(safe_value) or None
+            attribute_flags.update(flags)
+            attribute_redactions.update(counts)
+    out["attributes"] = attributes
+    out["schema_version"] = "1.4"
+    redaction_counts = Counter()
     ticket = dict(record.get("ticket", {}))
     text = ticket.get("description")
     if not isinstance(text, str):
@@ -34,6 +57,9 @@ def clean_record(record, allow_regex_only=False):
         use_ner=not allow_regex_only
     )
     safe_text = clean_text(safe_text)
+    flags = sorted(set(flags) | attribute_flags)
+    redaction_counts = Counter(redaction_counts)
+    redaction_counts.update(attribute_redactions)
     if not safe_text:
         return None, ["empty_after_redaction"], redaction_counts
 
@@ -84,7 +110,7 @@ def clean_record(record, allow_regex_only=False):
     return out, [], redaction_counts
 
 
-def run(input_dir, output_dir, allow_regex_only=False):
+def run(input_dir, output_dir, allow_regex_only=False, feature_engineering=False):
     if not allow_regex_only:
         ensure_person_ner_available()
 
@@ -107,6 +133,7 @@ def run(input_dir, output_dir, allow_regex_only=False):
         "actions": [
             "Normalize line endings and remove NUL bytes",
             "Redact detected PII before writing cleaned canonical records",
+            "Retain only allowlisted structured attributes and redact detected PII in string values",
             "Hash incident identifiers and exact-text split groups",
             "Trim description and label edges",
             "Preserve label values and spelling",
@@ -185,6 +212,14 @@ def run(input_dir, output_dir, allow_regex_only=False):
     (output_dir / "cleaning_report.json").write_text(
         json.dumps(report, indent=2) + "\n"
     )
+    if feature_engineering:
+        from features.engineer import generate_features
+        report["feature_engineering"] = generate_features(
+            output_dir, output_dir / "features"
+        )
+        (output_dir / "cleaning_report.json").write_text(
+            json.dumps(report, indent=2) + "\n"
+        )
     return report
 
 
@@ -202,9 +237,13 @@ def main():
         "--allow-regex-only", action="store_true",
         help="Explicitly bypass person/location NER; output is not production-ready"
     )
+    parser.add_argument(
+        "--feature-engineering", action="store_true",
+        help="Build train-fitted numerical features after cleaning"
+    )
     args = parser.parse_args()
     print(json.dumps(
-        run(args.input, args.output, args.allow_regex_only), indent=2
+        run(args.input, args.output, args.allow_regex_only, args.feature_engineering), indent=2
     ))
 
 

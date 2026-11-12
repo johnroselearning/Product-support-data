@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -173,6 +174,23 @@ def run(output, cache_dir, force_download=False, include_bitext=False,
                     label_text, require_ner=not allow_regex_only,
                     use_ner=not allow_regex_only
                 )
+
+                attribute_flags = set()
+                attribute_redactions = Counter()
+                date_key = re.compile(r"(?:date|time|created|updated|opened|closed|resolved)", re.I)
+                numeric_text = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)%?$")
+                for key, value in list(record.get("attributes", {}).items()):
+                    if isinstance(value, str) and not date_key.search(key) and not numeric_text.fullmatch(value):
+                        safe_value, attr_flags, attr_counts = redact_text(
+                            value, require_ner=not allow_regex_only,
+                            use_ner=not allow_regex_only
+                        )
+                        record["attributes"][key] = safe_value
+                        attribute_flags.update(attr_flags)
+                        attribute_redactions.update(attr_counts)
+                flags = sorted(set(flags) | attribute_flags)
+                redaction_counts = Counter(redaction_counts)
+                redaction_counts.update(attribute_redactions)
 
                 if label_flags:
                     quarantined.append({
