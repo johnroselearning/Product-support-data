@@ -1,0 +1,15 @@
+name: Dataset pipeline tests
+on:
+  push:
+    paths: ['datasets/**', '.github/workflows/dataset-tests.yml']
+  pull_request:
+    paths: ['datasets/**', '.github/workflows/dataset-tests.yml']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s datasets/tests -v
