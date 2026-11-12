@@ -70,3 +70,9 @@ Phrase checks use normalized substring matching, not semantic equivalence. Tool 
 ## Data safety
 
 Evaluation JSONL files and reports are ignored by Git by default. Do not commit raw or personal data. Store only redacted, reviewed cases in an access-controlled location. Review queues and gold evaluation JSONL files remain local and gitignored. CI uploads aggregate manifests and quality summaries only; it does not publish ticket text.
+
+## Schema enforcement
+
+Every review queue and released benchmark case must conform to `evaluation_case.schema.json` (JSON Schema Draft 2020-12). Both promotion and deterministic evaluation validate cases against this schema. An approved case must include a non-empty reviewer identity and an ISO-8601 review timestamp. This prevents incomplete or structurally inconsistent cases from being promoted or scored.
+
+The schema is intentionally task-extensible: task-specific labels live in `gold.labels`; root cause, resolution, answerability, required/forbidden facts, and expected tools remain nullable or empty until a human reviewer has evidence to approve them. Do not fill these fields from assumptions or language-model guesses.

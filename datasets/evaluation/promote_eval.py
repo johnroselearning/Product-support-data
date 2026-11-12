@@ -5,6 +5,11 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from .validation import load_validator, require_valid_case
+except ImportError:  # Support direct execution: python datasets/evaluation/promote_eval.py
+    from validation import load_validator, require_valid_case
+
 
 def read_jsonl(path):
     rows = []
@@ -31,7 +36,10 @@ def promote(input_path, output_path, manifest_path, expected_split):
 
     seen = set()
     reviewers = set()
+    schema_validator = load_validator()
     for row in rows:
+        case_id = row.get('case_id', '<missing>')
+        require_valid_case(row, case_id, schema_validator)
         case_id = row.get("case_id")
         if not case_id or case_id in seen:
             raise ValueError(f"Missing or duplicate case_id: {case_id}")
