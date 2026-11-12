@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from exporters.jsonl import write_jsonl
 from quality.privacy import detect_flags
+from normalization.sft import to_sft
 
 SPLITS=("train","validation","test")
 def clean_text(value):
@@ -82,6 +83,8 @@ def run(input_dir,output_dir):
                 accepted[split].append(cleaned)
     for split,records in accepted.items():
         write_jsonl(output_dir/"master"/f"{split}.jsonl",records)
+        sft_records=[to_sft(record) for record in records]
+        write_jsonl(output_dir/"sft"/f"{split}.jsonl",sft_records)
         report["by_split"][split]=len(records)
     report["accepted_records"]=sum(map(len,accepted.values()))
     report["excluded_records"]=len(quarantine)
