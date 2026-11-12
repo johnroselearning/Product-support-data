@@ -105,7 +105,7 @@ class ModularPipelineTests(unittest.TestCase):
         chosen, audit, quarantine, stats = deduplicate_records([base, other])
         self.assertEqual(chosen, [])
         self.assertEqual(len(quarantine), 2)
-        self.assertEqual(audit[0]["decision"], "quarantine_all_candidates_pending_review")
+        self.assertEqual(audit[0]["decision"], "quarantine_all_exact_input_candidates_conflicting_labels")
         self.assertEqual(stats["duplicate_label_conflict_groups"], 1)
 
     def test_same_identity_exact_duplicates_collapse(self):
@@ -139,7 +139,7 @@ class ModularPipelineTests(unittest.TestCase):
         chosen, audit, quarantine, stats = deduplicate_records([base, other])
         self.assertEqual(chosen, [])
         self.assertEqual(len(quarantine), 2)
-        self.assertEqual(audit[0]["decision"], "quarantine_all_exact_input_candidates_across_sources")
+        self.assertEqual(audit[0]["decision"], "quarantine_all_exact_input_candidates_conflicting_labels")
 
     def test_distinct_incidents_with_same_text_are_preserved(self):
         base = {
