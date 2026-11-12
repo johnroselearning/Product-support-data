@@ -120,9 +120,23 @@ def run(input_dir, output_path, manifest_path, size=150, seed=20261112, split="t
     if split not in {"validation", "test"}:
         raise ValueError("split must be validation or test")
     records = read_split_records(input_dir, split)
+    # Select one deterministic representative per verified incident identity.
+    by_identity = defaultdict(list)
+    for record in records:
+        if record.get("source_group_type") == "incident_id":
+            identity = (record["source"], record["source_group"])
+        else:
+            identity = (record["source"], record["case_id"])
+        by_identity[identity].append(record)
+    identity_representatives = [
+        sorted(rows, key=lambda r: (r.get("upstream_row", 0), r["case_id"]))[0]
+        for rows in by_identity.values()
+    ]
+    collapsed_incident_messages = len(records) - len(identity_representatives)
+
     # Exact text duplicates across sources are not independent eval examples.
     by_fingerprint = defaultdict(list)
-    for record in records:
+    for record in identity_representatives:
         by_fingerprint[record.get("fingerprint", record["case_id"])].append(record)
 
     eligible = []
@@ -178,6 +192,7 @@ def run(input_dir, output_path, manifest_path, size=150, seed=20261112, split="t
         "actual_size": len(cases),
         "seed": seed,
         "eligible_records": len(eligible),
+        "collapsed_additional_messages_from_same_incident": collapsed_incident_messages,
         "excluded_conflicting_exact_text_records": excluded_conflicts,
         "by_task": dict(by_task),
         "by_stratum": dict(by_stratum),
