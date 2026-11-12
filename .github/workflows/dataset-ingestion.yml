@@ -71,20 +71,19 @@ jobs:
             cat datasets/generated/manifest.json
           fi
 
-      - name: Upload normalized dataset artifacts
+      - name: Upload aggregate quality reports only
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: normalized-support-dataset
+          name: support-dataset-quality-reports
           path: |
-            datasets/generated/master/
-            datasets/generated/sft/
             datasets/generated/manifest.json
-            datasets/generated/duplicate_audit.jsonl
-            datasets/generated/quarantine.jsonl
-            datasets/eda/
-            datasets/cleaned/
-            datasets/quality_report/
-            datasets/evaluation/review_queue_v1.jsonl
+            datasets/eda/eda_summary.json
+            datasets/eda/source_split_counts.csv
+            datasets/eda/label_distribution.csv
+            datasets/cleaned/cleaning_report.json
+            datasets/quality_report/dataset_quality_report.json
+            datasets/quality_report/DATASET_QUALITY_REPORT.md
+            datasets/quality_report/near_duplicate_summary.json
             datasets/evaluation/review_queue_manifest.json
           retention-days: 30
