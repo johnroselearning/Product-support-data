@@ -1,6 +1,7 @@
 """Orchestrate download, PII redaction, identity-aware deduplication, splitting and export."""
 import argparse
 import json
+import os
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -15,6 +16,14 @@ from normalization.sft import to_sft
 from exporters.jsonl import write_jsonl
 
 ROOT = Path(__file__).resolve().parent
+
+
+def restrict_directory_permissions(path):
+    if not path.exists():
+        return
+    os.chmod(path, 0o700)
+    for child in path.rglob("*"):
+        os.chmod(child, 0o700 if child.is_dir() else 0o600)
 
 
 def deduplicate_records(records):
@@ -118,8 +127,14 @@ def run(output, cache_dir, force_download=False, include_bitext=False,
     if not allow_regex_only:
         ensure_person_ner_available()
 
+    # Downloaded snapshots/cache can contain source PII. Restrict local access.
+    os.umask(0o077)
     registry = json.loads((ROOT / "sources.json").read_text())
     raw_dir = ROOT / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(raw_dir, 0o700)
+    Path(cache_dir).mkdir(parents=True, exist_ok=True, mode=0o700)
+    restrict_directory_permissions(Path(cache_dir))
     all_records, quarantined, stats, source_runs = [], [], Counter(), []
 
     for source in registry["sources"]:
@@ -133,6 +148,8 @@ def run(output, cache_dir, force_download=False, include_bitext=False,
         dataset, download_info = download_source(
             source, raw_dir, cache_dir, force_download
         )
+        restrict_directory_permissions(raw_dir)
+        restrict_directory_permissions(Path(cache_dir))
         source_runs.append({"source": source["id"], **download_info})
 
         for upstream_split, rows in dataset.items():
