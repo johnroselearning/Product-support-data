@@ -25,6 +25,7 @@ def load_records(root):
                     "label_value":str(next(iter(r["labels"].values()), "")),
                     "case_id":r["case_id"],"fingerprint":r["fingerprint"],
                     "source_group":r["source_group"],
+                    "source_group_type":r.get("source_group_type", "unknown"),
                     "privacy_flags":r.get("quality",{}).get("privacy_flags",[])})
     return pd.DataFrame(rows)
 def run(input_dir, output_dir):
@@ -43,6 +44,7 @@ def run(input_dir, output_dir):
       "duplicate_fingerprints_within_source":int(df.duplicated(["source","fingerprint"]).sum()),
       "duplicate_fingerprints_across_sources":int(df.duplicated(["fingerprint"]).sum()),
       "fingerprint_groups_crossing_splits":int((df.groupby(["fingerprint"])["split"].nunique()>1).sum()),
+      "incident_groups_crossing_splits":int((df[df.source_group_type == "incident_id"].groupby(["source","source_group"])["split"].nunique()>1).sum()) if "source_group_type" in df.columns else 0,
       "privacy_flagged_master_records":int(df.privacy_flags.map(bool).sum()),
       "missing_label_count":int(df.label_value.str.strip().eq("").sum())
     }
