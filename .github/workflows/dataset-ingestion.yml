@@ -7,6 +7,11 @@ on:
     paths:
       - 'datasets/**'
       - '.github/workflows/dataset-ingestion.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'datasets/**'
+      - '.github/workflows/dataset-ingestion.yml'
 
 permissions:
   contents: read
