@@ -42,3 +42,16 @@ After reviewing EDA, run `python datasets/cleaning/clean.py`. It reads normalize
 After EDA and cleaning, run `python datasets/quality_report.py`. It writes JSON and Markdown summaries under `datasets/quality_report/`, including cleaned counts, duplicate audit conflicts, quarantine counts, label distributions, text lengths, and a support-agent capability gap. Review `DATASET_GAP_ANALYSIS.md` before enabling any new source. New candidates remain `review_required` and are not downloaded by default.
 
 Cleaned SFT files are written to `datasets/cleaned/sft/` alongside cleaned master files. Keep raw, normalized and cleaned layers separate. The cleaning stage is intentionally conservative and does not infer technical diagnoses or resolutions.
+
+## Candidate customer-support datasets
+
+Initial public-page/preview review is recorded in `research/CUSTOMER_SUPPORT_DATASET_REVIEW_2026-11-12.md`. Candidate registrations in `sources.json` do not enable ingestion. Do not commit raw Kaggle files. After downloading approved candidates locally, profile them without printing row text or personal values:
+
+```bash
+python datasets/research/profile_customer_support_csvs.py \
+  datasets/raw/kaggle/suraj520 \
+  datasets/raw/kaggle/waseem_alastal \
+  datasets/raw/kaggle/tobi_multilingual
+```
+
+The script records file SHA-256 hashes, schema, missingness, duplicates, label distributions, text-template indicators, and text/label conflict counts. It writes aggregate output to `datasets/research/customer_support_csv_profile.json`, which is gitignored. It does not certify privacy or semantic correctness.
