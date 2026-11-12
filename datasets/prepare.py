@@ -1,6 +1,8 @@
 """Orchestrate download, PII redaction, identity-aware deduplication, splitting and export."""
 import argparse
 import json
+import os
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -17,59 +19,72 @@ from exporters.jsonl import write_jsonl
 ROOT = Path(__file__).resolve().parent
 
 
-def deduplicate_records(records):
-    """Collapse repeats within a known identity; preserve distinct incidents.
+def restrict_directory_permissions(path):
+    if not path.exists():
+        return
+    os.chmod(path, 0o700)
+    for child in path.rglob("*"):
+        os.chmod(child, 0o700 if child.is_dir() else 0o600)
 
-    Conflicting labels for identical model inputs are quarantined because the
-    current SFT prompt has no additional feature to distinguish those labels.
+
+def deduplicate_records(records):
+    """Deduplicate exact repeats without confusing distinct incident identities.
+
+    Conflicting labels for the same exact model input and task are quarantined
+    across sources. Same-label rows from distinct verified incident IDs survive.
     """
-    groups = defaultdict(list)
+    global_groups = defaultdict(list)
     for record in records:
-        groups[(record["source"], record["fingerprint"])].append(record)
+        global_groups[(record["fingerprint"], record["task"])].append(record)
 
     chosen, duplicate_audit, conflict_quarantine = [], [], []
     stats = Counter()
+    conflicted_case_ids = set()
 
-    for (source, fingerprint), candidates in groups.items():
+    for (fingerprint, task), candidates in global_groups.items():
         labels = {json.dumps(r["labels"], sort_keys=True) for r in candidates}
-        ordered = sorted(
-            candidates,
-            key=lambda r: (r["upstream_split"] != "test", r["upstream_row"])
-        )
-
         if len(labels) > 1:
             stats["duplicate_label_conflict_groups"] += 1
-            stats["conflict_records_quarantined"] += len(ordered)
+            stats["conflict_records_quarantined"] += len(candidates)
+            conflicted_case_ids.update(r["case_id"] for r in candidates)
             duplicate_audit.append({
-                "source": source,
                 "fingerprint": fingerprint,
+                "task": task,
+                "sources": sorted({r["source"] for r in candidates}),
                 "label_conflict": True,
-                "decision": "quarantine_all_candidates_pending_review",
-                "candidate_count": len(ordered),
+                "decision": "quarantine_all_exact_input_candidates_conflicting_labels",
+                "candidate_count": len(candidates),
                 "candidates": [{
                     "case_id": r["case_id"],
+                    "source": r["source"],
                     "upstream_split": r["upstream_split"],
-                    "upstream_row": r["upstream_row"],
                     "source_group_type": r.get("source_group_type", "unknown"),
                     "labels": r["labels"]
-                } for r in ordered]
+                } for r in candidates]
             })
-            for record in ordered:
+            for record in candidates:
                 conflict_quarantine.append({
                     "case_id": record["case_id"],
-                    "source": source,
+                    "source": record["source"],
                     "original_split": record["upstream_split"],
                     "reasons": ["duplicate_text_with_conflicting_labels"],
                     "fingerprint": fingerprint
                 })
-            continue
 
+    source_groups = defaultdict(list)
+    for record in records:
+        if record["case_id"] not in conflicted_case_ids:
+            source_groups[
+                (record["source"], record["fingerprint"], record["task"])
+            ].append(record)
+
+    for (source, fingerprint, task), candidates in source_groups.items():
         by_identity = defaultdict(list)
-        for record in ordered:
+        for record in candidates:
             by_identity[record["source_group"]].append(record)
 
         retained_for_text = []
-        for identity, identity_rows in by_identity.items():
+        for identity_rows in by_identity.values():
             identity_rows.sort(
                 key=lambda r: (r["upstream_split"] != "test", r["upstream_row"])
             )
@@ -82,6 +97,7 @@ def deduplicate_records(records):
                 duplicate_audit.append({
                     "source": source,
                     "fingerprint": fingerprint,
+                    "task": task,
                     "excluded_case_id": excluded["case_id"],
                     "retained_case_id": retained["case_id"],
                     "excluded_upstream_split": excluded["upstream_split"],
@@ -95,6 +111,7 @@ def deduplicate_records(records):
             duplicate_audit.append({
                 "source": source,
                 "fingerprint": fingerprint,
+                "task": task,
                 "decision": "preserve_same_text_distinct_incident_identities",
                 "identity_count": len(retained_for_text),
                 "incident_identity_verified": all(
@@ -106,14 +123,19 @@ def deduplicate_records(records):
 
     return chosen, duplicate_audit, conflict_quarantine, stats
 
-
 def run(output, cache_dir, force_download=False, include_bitext=False,
         allow_regex_only=False):
     if not allow_regex_only:
         ensure_person_ner_available()
 
+    # Downloaded snapshots/cache can contain source PII. Restrict local access.
+    os.umask(0o077)
     registry = json.loads((ROOT / "sources.json").read_text())
     raw_dir = ROOT / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(raw_dir, 0o700)
+    Path(cache_dir).mkdir(parents=True, exist_ok=True, mode=0o700)
+    restrict_directory_permissions(Path(cache_dir))
     all_records, quarantined, stats, source_runs = [], [], Counter(), []
 
     for source in registry["sources"]:
@@ -127,6 +149,8 @@ def run(output, cache_dir, force_download=False, include_bitext=False,
         dataset, download_info = download_source(
             source, raw_dir, cache_dir, force_download
         )
+        restrict_directory_permissions(raw_dir)
+        restrict_directory_permissions(Path(cache_dir))
         source_runs.append({"source": source["id"], **download_info})
 
         for upstream_split, rows in dataset.items():
@@ -142,12 +166,31 @@ def run(output, cache_dir, force_download=False, include_bitext=False,
                 original_fingerprint = record["fingerprint"]
                 description, flags, redaction_counts = redact_text(
                     record["ticket"]["description"],
-                    require_ner=not allow_regex_only
+                    require_ner=not allow_regex_only,
+                    use_ner=not allow_regex_only
                 )
                 label_text = " ".join(record["labels"].values())
                 _, label_flags, _ = redact_text(
-                    label_text, require_ner=not allow_regex_only
+                    label_text, require_ner=not allow_regex_only,
+                    use_ner=not allow_regex_only
                 )
+
+                attribute_flags = set()
+                attribute_redactions = Counter()
+                date_key = re.compile(r"(?:date|time|created|updated|opened|closed|resolved)", re.I)
+                numeric_text = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)%?$")
+                for key, value in list(record.get("attributes", {}).items()):
+                    if isinstance(value, str) and not date_key.search(key) and not numeric_text.fullmatch(value):
+                        safe_value, attr_flags, attr_counts = redact_text(
+                            value, require_ner=not allow_regex_only,
+                            use_ner=not allow_regex_only
+                        )
+                        record["attributes"][key] = safe_value
+                        attribute_flags.update(attr_flags)
+                        attribute_redactions.update(attr_counts)
+                flags = sorted(set(flags) | attribute_flags)
+                redaction_counts = Counter(redaction_counts)
+                redaction_counts.update(attribute_redactions)
 
                 if label_flags:
                     quarantined.append({
@@ -198,18 +241,24 @@ def run(output, cache_dir, force_download=False, include_bitext=False,
 
     assignments = assign_records(chosen)
     master = {name: [] for name in ("train", "validation", "test")}
-    sft = {name: [] for name in master}
+    sft = {"train": [], "validation": []}
 
     for record in chosen:
         split_key = (record["source"], record.get("split_group") or record["source_group"])
         split = assignments[split_key]
         master[split].append(record)
-        sft[split].append(to_sft(record))
+        if split in sft:
+            sft[split].append(to_sft(record))
         stats[f'{record["source"]}:normalized:{split}'] += 1
 
     for split in master:
         write_jsonl(output / "master" / f"{split}.jsonl", master[split])
+    for split in ("train", "validation"):
         write_jsonl(output / "sft" / f"{split}.jsonl", sft[split])
+    # Never leave a stale test SFT file from an older pipeline version.
+    stale_test_sft = output / "sft" / "test.jsonl"
+    if stale_test_sft.exists():
+        stale_test_sft.unlink()
 
     write_jsonl(output / "quarantine.jsonl", quarantined)
     write_jsonl(output / "duplicate_audit.jsonl", duplicate_audit)

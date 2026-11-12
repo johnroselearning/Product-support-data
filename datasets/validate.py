@@ -1,14 +1,16 @@
 """Validate canonical normalized output and reject unredacted PII."""
 import argparse
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
 from quality.privacy import detect_flags, ensure_person_ner_available
+from adapters.common import safe_attributes
 
 SPLITS = ("train", "validation", "test")
 REQUIRED = {
-    "schema_version", "case_id", "source", "task", "ticket", "labels",
+    "schema_version", "case_id", "source", "task", "ticket", "attributes", "labels",
     "evidence", "actions", "root_cause", "resolution", "quality",
     "fingerprint", "source_group", "source_group_type", "split_group"
 }
@@ -22,6 +24,7 @@ def validate(root, allow_regex_only=False):
     seen_ids = set()
     fingerprint_splits = {}
     group_splits = {}
+    incident_group_splits = {}
     errors = []
 
     for split in SPLITS:
@@ -43,10 +46,20 @@ def validate(root, allow_regex_only=False):
                         raise ValueError("empty ticket description")
                     if not isinstance(rec["labels"], dict) or not rec["labels"]:
                         raise ValueError("missing labels")
+                    if not isinstance(rec["attributes"], dict):
+                        raise ValueError("attributes must be an object")
+                    if safe_attributes(rec["attributes"]) != rec["attributes"]:
+                        raise ValueError("attributes contain non-allowlisted keys or values")
                     if rec["root_cause"] != "unknown" or rec["resolution"] != "unknown":
                         raise ValueError("unverified outcomes in canonical record")
 
-                    pii_flags = detect_flags(description)
+                    pii_flags = detect_flags(description, use_ner=not allow_regex_only)
+                    date_key = re.compile(r"(?:date|time|created|updated|opened|closed|resolved)", re.I)
+                    numeric_text = re.compile(r"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)%?$")
+                    for key, value in rec["attributes"].items():
+                        if isinstance(value, str) and not date_key.search(key) and not numeric_text.fullmatch(value):
+                            pii_flags.extend(detect_flags(value, use_ner=not allow_regex_only))
+                    pii_flags = sorted(set(pii_flags))
                     if pii_flags:
                         raise ValueError("unredacted PII categories: " + ",".join(pii_flags))
 
@@ -55,16 +68,25 @@ def validate(root, allow_regex_only=False):
                         raise ValueError("duplicate case ID")
                     seen_ids.add(case_id)
 
-                    fingerprint_key = (rec["source"], rec["fingerprint"])
+                    fingerprint_key = rec["fingerprint"]
                     previous_split = fingerprint_splits.get(fingerprint_key)
                     if previous_split is not None and previous_split != split:
                         raise ValueError("identical text crosses split boundary")
                     fingerprint_splits[fingerprint_key] = split
 
-                    group = (rec["source"], rec["split_group"])
+                    group = rec["split_group"]
                     if group in group_splits and group_splits[group] != split:
                         raise ValueError("exact-text split group crosses split boundary")
                     group_splits[group] = split
+
+                    if rec.get("source_group_type") == "incident_id":
+                        incident_group = (rec["source"], rec["source_group"])
+                        if (
+                            incident_group in incident_group_splits
+                            and incident_group_splits[incident_group] != split
+                        ):
+                            raise ValueError("incident identity crosses split boundary")
+                        incident_group_splits[incident_group] = split
 
                     counts[split] += 1
                 except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:

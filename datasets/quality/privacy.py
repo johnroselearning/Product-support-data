@@ -1,8 +1,8 @@
 """PII screening and redaction for support-ticket text.
 
 Regex coverage is supplemented by spaCy NER for person and location entities.
-The pipeline requires the en_core_web_sm model before processing production data.
-No detector guarantees complete anonymization; human review remains required.
+The production pipeline requires en_core_web_sm. No detector guarantees complete
+anonymization; human review and language-specific screening remain required.
 """
 from __future__ import annotations
 
@@ -14,19 +14,28 @@ PATTERNS = {
     "email": re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b"),
     "phone": re.compile(r"(?<!\w)(?:\+?\d[\d .()/-]{7,}\d)(?!\w)"),
     "secret_assignment": re.compile(
-        r"(?i)\b(?:api[_-]?key|access[_-]?token|password|passwd|secret|client[_-]?secret)"
+        r"(?i)\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|auth[_-]?token|token|password|passwd|pwd|secret|client[_-]?secret)"
         r"\s*[:=]\s*['\"]?[^,\s;'\"}]+"
     ),
     "bearer_token": re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{8,}"),
     "jwt": re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b"),
     "aws_access_key": re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"),
     "github_token": re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b"),
+    "provider_token": re.compile(
+        r"\b(?:sk-[A-Za-z0-9_-]{16,}|sk_(?:live|test)_[A-Za-z0-9]{16,}|"
+        r"rk_live_[A-Za-z0-9]{16,}|xox[baprs]-[A-Za-z0-9-]{10,})\b"
+    ),
+    "private_key": re.compile(
+        r"-----BEGIN (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----.*?"
+        r"-----END (?:RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----",
+        re.DOTALL
+    ),
     "account_identifier": re.compile(
         r"(?i)\b(?:account|customer|tenant|subscription|user|employee|order|member)"
         r"\s*(?:id|number|no\.?|#)\s*[:=#-]?\s*[A-Z0-9][A-Z0-9_-]{3,}\b"
     ),
     "ipv4": re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])"),
-    "ipv6": re.compile(r"(?i)(?<![\w:])(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}(?![\w:])"),
+    "ipv6": re.compile(r"(?i)(?<![\w.])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?![\w.])"),
     "street_address": re.compile(
         r"(?i)\b\d{1,6}\s+[A-Z0-9.'-]+(?:\s+[A-Z0-9.'-]+){0,5}\s+"
         r"(?:street|st|road|rd|avenue|ave|lane|ln|drive|dr|boulevard|blvd|"
@@ -51,6 +60,7 @@ def privacy_capabilities():
         "regex_screening": True,
         "person_and_location_ner": _load_ner() is not None,
         "ner_model": "en_core_web_sm",
+        "ner_language": "en"
     }
 
 
@@ -98,22 +108,22 @@ def _collect_spans(text, use_ner=True):
     return spans, sorted(flags), counts
 
 
-def detect_flags(text):
+def detect_flags(text, use_ner=True):
     """Return PII categories found; does not expose matched values."""
     if not isinstance(text, str):
         return []
-    _, flags, _ = _collect_spans(text)
+    _, flags, _ = _collect_spans(text, use_ner=use_ner)
     return flags
 
 
-def redact_text(text, require_ner=False):
+def redact_text(text, require_ner=False, use_ner=True):
     """Redact detected spans and return (safe_text, categories, per-category counts)."""
     if not isinstance(text, str):
         raise TypeError("redact_text expects a string")
     if require_ner:
         ensure_person_ner_available()
 
-    spans, flags, counts = _collect_spans(text)
+    spans, flags, counts = _collect_spans(text, use_ner=use_ner)
     if not spans:
         return text, flags, counts
 

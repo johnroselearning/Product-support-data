@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/johnroselearning/Product-support-data/blob/main/datasets/evaluation/evaluation_case.schema.json",
+  "title": "PSI Human-Reviewed Evaluation Case",
+  "description": "A task-specific evaluation case. Source labels are provisional until human review approves them. Do not infer RCA, resolution, answerability, required facts, or tools.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "task",
+    "input",
+    "gold",
+    "tags",
+    "provenance",
+    "selection",
+    "review"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ticket",
+        "context"
+      ],
+      "properties": {
+        "ticket": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "object"
+            }
+          ]
+        }
+      }
+    },
+    "gold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "labels",
+        "root_cause",
+        "resolution",
+        "must_include",
+        "must_not",
+        "expected_tools",
+        "answerable"
+      ],
+      "properties": {
+        "labels": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "root_cause": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resolution": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "must_include": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "must_not": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "expected_tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "answerable": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "source",
+        "source_case_id",
+        "source_revision",
+        "license",
+        "source_split"
+      ],
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "source_case_id": {
+          "type": "string"
+        },
+        "source_revision": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        },
+        "source_split": {
+          "enum": [
+            "validation",
+            "test"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "required": [
+        "method",
+        "stratum",
+        "seed"
+      ],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "stratum": {
+          "type": "string"
+        },
+        "seed": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "review": {
+      "type": "object",
+      "required": [
+        "status",
+        "reviewer",
+        "reviewed_at",
+        "notes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected"
+          ]
+        },
+        "reviewer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "review": {
+            "properties": {
+              "status": {
+                "const": "approved"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "review": {
+            "properties": {
+              "reviewer": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reviewed_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

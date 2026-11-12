@@ -31,8 +31,8 @@ def load_records(root):
                     "label_value":str(next(iter(r["labels"].values()), "")),
                     "case_id":r["case_id"],"fingerprint":r["fingerprint"],
                     "source_group":r["source_group"],
-                    "privacy_flags":r.get("quality",{}).get("privacy_flags",[])
-                })
+                    "source_group_type":r.get("source_group_type", "unknown"),
+                    "privacy_flags":r.get("quality",{}).get("privacy_flags",[])})
     return pd.DataFrame(rows)
 
 def _finite_number(value):
@@ -104,6 +104,8 @@ def run(input_dir, output_dir):
         }
         for split,group in df.groupby("split",sort=True)
     }
+    cross_source_fingerprints = df.groupby("fingerprint")["source"].nunique()
+    cross_source_group_ids = set(cross_source_fingerprints[cross_source_fingerprints > 1].index)
     summary={
       "records":int(len(df)),
       "by_source":{str(k):int(v) for k,v in df.source.value_counts().items()},
@@ -116,7 +118,10 @@ def run(input_dir, output_dir):
       "correlations":_correlation_summary(df),
       "empty_text_count":int((df.description.str.strip()=="").sum()),
       "duplicate_fingerprints_within_source":int(df.duplicated(["source","fingerprint"]).sum()),
-      "fingerprint_groups_crossing_splits":int((df.groupby(["source","fingerprint"])["split"].nunique()>1).sum()),
+      "fingerprint_groups_appearing_in_multiple_sources":int((cross_source_fingerprints > 1).sum()),
+      "records_in_cross_source_exact_text_groups":int(df.fingerprint.isin(cross_source_group_ids).sum()),
+      "fingerprint_groups_crossing_splits":int((df.groupby(["fingerprint"])["split"].nunique()>1).sum()),
+      "incident_groups_crossing_splits":int((df[df.source_group_type == "incident_id"].groupby(["source","source_group"])["split"].nunique()>1).sum()) if "source_group_type" in df.columns else 0,
       "privacy_flagged_master_records":int(df.privacy_flags.map(bool).sum()),
       "missing_label_count":int(df.label_value.str.strip().eq("").sum())
     }
