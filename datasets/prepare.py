@@ -198,18 +198,24 @@ def run(output, cache_dir, force_download=False, include_bitext=False,
 
     assignments = assign_records(chosen)
     master = {name: [] for name in ("train", "validation", "test")}
-    sft = {name: [] for name in master}
+    sft = {"train": [], "validation": []}
 
     for record in chosen:
         split_key = (record["source"], record.get("split_group") or record["source_group"])
         split = assignments[split_key]
         master[split].append(record)
-        sft[split].append(to_sft(record))
+        if split in sft:
+            sft[split].append(to_sft(record))
         stats[f'{record["source"]}:normalized:{split}'] += 1
 
     for split in master:
         write_jsonl(output / "master" / f"{split}.jsonl", master[split])
+    for split in ("train", "validation"):
         write_jsonl(output / "sft" / f"{split}.jsonl", sft[split])
+    # Never leave a stale test SFT file from an older pipeline version.
+    stale_test_sft = output / "sft" / "test.jsonl"
+    if stale_test_sft.exists():
+        stale_test_sft.unlink()
 
     write_jsonl(output / "quarantine.jsonl", quarantined)
     write_jsonl(output / "duplicate_audit.jsonl", duplicate_audit)
