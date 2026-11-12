@@ -42,6 +42,12 @@ jobs:
       - name: Generate exploratory data analysis
         run: python datasets/eda.py
 
+      - name: Clean normalized records conservatively
+        run: python datasets/cleaning/clean.py
+
+      - name: Validate cleaned records
+        run: python datasets/validate.py --input datasets/cleaned
+
       - name: Display ingestion report
         if: always()
         run: |
@@ -59,4 +65,5 @@ jobs:
             datasets/generated/sft/
             datasets/generated/manifest.json
             datasets/eda/
+            datasets/cleaned/
           retention-days: 30
