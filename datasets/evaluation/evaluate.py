@@ -8,6 +8,8 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from validation import load_validator, require_valid_case
+
 
 def read_jsonl(path):
     rows = []
@@ -38,7 +40,9 @@ def evaluate(gold_rows, prediction_rows):
         raise ValueError("Gold evaluation set is empty.")
     gold_by_id = {}
     gold_splits = set()
+    schema_validator = load_validator()
     for row in gold_rows:
+        require_valid_case(row, row.get('case_id', '<missing>'), schema_validator)
         case_id = row.get("case_id")
         if not case_id or case_id in gold_by_id:
             raise ValueError(f"Missing or duplicate gold case_id: {case_id}")
