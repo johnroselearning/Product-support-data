@@ -1,0 +1,2 @@
+# Optional interactive dataframe explorer; separate from the core pipeline.
+dtale>=3.22,<4
