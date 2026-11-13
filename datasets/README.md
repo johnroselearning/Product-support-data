@@ -147,3 +147,24 @@ python datasets/evaluation/evaluate.py --gold datasets/evaluation/eval_v1.jsonl 
 ```
 
 The evaluator reports label metrics, answerability, required/forbidden fact checks and expected-tool metrics where reviewed gold fields exist. LLM judging is advisory and must be calibrated against at least 20–30 human-reviewed cases using evaluation/JUDGE_RUBRIC.md.
+
+
+## Interactive product-support data exploration with D-Tale
+
+D-Tale provides a browser UI for exploring a Pandas DataFrame, including filtering, summaries, charts, correlations and in-memory cell edits. It is optional and separate from the preparation pipeline.
+
+Install its isolated optional dependency and launch it against cleaned records:
+
+```bash
+pip install -r datasets/requirements-dtale.txt
+python datasets/research/dtale_viewer.py
+```
+
+By default the viewer uses `datasets/cleaned/master/` when available, otherwise `datasets/generated/master/`. Choose one file or a directory of JSONL splits, or point it at a CSV/Parquet file such as a locally downloaded support-ticket CSV:
+
+```bash
+python datasets/research/dtale_viewer.py --input datasets/cleaned/master/train.jsonl
+python datasets/research/dtale_viewer.py --input datasets/raw/kaggle/your_dataset/tickets.csv
+```
+
+The server binds to `127.0.0.1` on port `40000` by default. Keep it local because ticket data may be sensitive. Cell edits are in memory; export any reviewed result from D-Tale to a separate file. The original dataset and pipeline outputs are not overwritten.
