@@ -168,3 +168,18 @@ python datasets/research/dtale_viewer.py --input datasets/raw/kaggle/your_datase
 ```
 
 The server binds to `127.0.0.1` on port `40000` by default. Keep it local because ticket data may be sensitive. Cell edits are in memory; export any reviewed result from D-Tale to a separate file. The original dataset and pipeline outputs are not overwritten.
+
+
+## Dataset-agnostic exploratory analysis
+
+For a downloaded product-support CSV, synthetic ticket CSV, or another tabular dataset, run the generic profiler. This does not require selecting a model outcome:
+
+```bash
+python datasets/research/explore_support_dataset.py \
+  --input /path/to/support_tickets.csv \
+  --output datasets/eda/my_dataset
+```
+
+It accepts CSV, JSONL/NDJSON, JSON, Parquet, or a directory of JSONL splits. The report contains per-column types, missingness, distinct values, common values, numeric summaries and IQR outlier counts, text-length checks, duplicate-row counts, Pearson/Spearman/Kendall correlations for numeric columns, and charts. Outputs are written separately; input data is not altered.
+
+Review `eda_summary.json`, `column_profile.json`, `correlation_*.csv`, and the PNG charts. The profiler adds name-based hints for possible identifiers, sensitive fields, and outcome columns. These are only review prompts: they do not select features or a target, and a column name cannot establish whether a field is valid at prediction time. Correlation is descriptive and does not imply causation. Protect the input and generated reports as carefully as the source tickets because reports can include examples and value distributions.
