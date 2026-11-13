@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-ID_HINT = re.compile(r"(^|_)(id|uuid|email|phone|name|account|customer|user|token|secret)(_|$)", re.I)
+ID_HINT = re.compile(r"(^|[ _])(id|uuid|email|phone|name|account|customer|user|token|secret)([ _]|$)", re.I)\nSENSITIVE_HINT = re.compile(r"(email|phone|name|account|user|token|secret|address|ticket\\s*id)", re.I)
 TARGET_HINT = re.compile(r"(label|target|category|class|priority|severity|status|resolution|outcome|queue|team)", re.I)
 TEXT_HINT = re.compile(r"(text|description|body|subject|message|comment|summary|title|resolution|answer)", re.I)
 MAX_CORR_COLUMNS = 80
@@ -69,7 +69,7 @@ def column_profile(df: pd.DataFrame) -> list[dict]:
             "missing_pct": round(float(s.isna().mean() * 100), 3) if len(s) else 0,
             "distinct_count": unique,
             "distinct_pct_of_non_null": round(unique / len(non_null) * 100, 3) if len(non_null) else 0,
-            "examples": [clean_scalar(v) for v in non_null.drop_duplicates().head(5)],
+            "examples": [] if sensitive else [clean_scalar(v) for v in non_null.drop_duplicates().head(5)],
             "role_review_hints": [],
         }
         if ID_HINT.search(str(col)):
