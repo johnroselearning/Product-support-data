@@ -183,3 +183,23 @@ python datasets/research/explore_support_dataset.py \
 It accepts CSV, JSONL/NDJSON, JSON, Parquet, or a directory of JSONL splits. The report contains per-column types, missingness, distinct values, common values, numeric summaries and IQR outlier counts, text-length checks, duplicate-row counts, Pearson/Spearman/Kendall correlations for numeric columns, and charts. Outputs are written separately; input data is not altered.
 
 Review `eda_summary.json`, `column_profile.json`, `correlation_*.csv`, and the PNG charts. The profiler adds name-based hints for possible identifiers, sensitive fields, and outcome columns. These are only review prompts: they do not select features or a target, and a column name cannot establish whether a field is valid at prediction time. Correlation is descriptive and does not imply causation. Protect the input and generated reports as carefully as the source tickets because reports can include examples and value distributions.
+
+
+## Conservative cleaning for candidate support CSVs
+
+For candidate Kaggle support-ticket CSVs, make a separate privacy-reduced working copy and quality report before exploring:
+
+```bash
+python datasets/research/clean_customer_support_csv.py \
+  --input datasets/raw/kaggle/waseem_alastal/customer_support_tickets.csv \
+  --output datasets/cleaned/waseem_alastal/customer_support_tickets.csv \
+  --report datasets/cleaned/waseem_alastal/quality_report.json
+
+python datasets/research/explore_support_dataset.py \
+  --input datasets/cleaned/waseem_alastal/customer_support_tickets.csv \
+  --output datasets/eda/waseem_alastal
+```
+
+The cleaner removes direct identifier columns such as ticket ID, customer name and email; normalizes blank strings; parses date/time-like columns where possible; reports missingness, parse failures, duplicates, and missingness by ticket status. It preserves records and missing values: it does not impute outcomes or delete rows. Review the meaning of `Time to Resolution` before deriving a duration. For a particular supervised task, exclude rows with a missing target only from that task's training/evaluation set. Do not use post-resolution fields as features for a prediction made earlier in the support lifecycle.
+
+The generic profiler omits example values for sensitive-looking fields and excludes identifier-like numeric fields from correlations. It can still report value examples from other columns, so treat reports as sensitive and inspect free text before sharing. Both programs write to separate output paths and leave the raw CSV untouched.
