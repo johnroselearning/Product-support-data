@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-ID_HINT = re.compile(r"(^|[ _])(id|uuid|email|phone|name|account|customer|user|token|secret)([ _]|$)", re.I)\nSENSITIVE_HINT = re.compile(r"(email|phone|name|account|user|token|secret|address|ticket\\s*id)", re.I)
+ID_HINT = re.compile(r"(^|[ _])(id|uuid|email|phone|name|account|customer|user|token|secret)([ _]|$)", re.I)
+SENSITIVE_HINT = re.compile(r"(email|phone|name|account|user|token|secret|address|ticket\\s*id)", re.I)
 TARGET_HINT = re.compile(r"(label|target|category|class|priority|severity|status|resolution|outcome|queue|team)", re.I)
 TEXT_HINT = re.compile(r"(text|description|body|subject|message|comment|summary|title|resolution|answer)", re.I)
 MAX_CORR_COLUMNS = 80
@@ -63,6 +64,7 @@ def column_profile(df: pd.DataFrame) -> list[dict]:
         s = df[col]
         non_null = s.dropna()
         unique = int(s.nunique(dropna=True))
+        sensitive = bool(SENSITIVE_HINT.search(str(col)))
         item = {
             "column": str(col), "dtype": str(s.dtype), "rows": int(len(s)),
             "missing_count": int(s.isna().sum()),
@@ -102,7 +104,7 @@ def column_profile(df: pd.DataFrame) -> list[dict]:
                     "characters_max": int(lengths.max()) if len(lengths) else None,
                 }
             item["top_values"] = [
-                {"value": clean_scalar(k), "count": int(v)}
+                {"value": "<omitted: sensitive column>" if sensitive else clean_scalar(k), "count": int(v)}
                 for k, v in s.value_counts(dropna=False).head(MAX_PROFILE_VALUES).items()
             ]
         profiles.append(item)
@@ -111,6 +113,7 @@ def column_profile(df: pd.DataFrame) -> list[dict]:
 
 def correlations(df: pd.DataFrame) -> dict:
     numeric = df.select_dtypes(include="number")
+    numeric = numeric.loc[:, [c for c in numeric.columns if not ID_HINT.search(str(c))]]
     if numeric.shape[1] > MAX_CORR_COLUMNS:
         numeric = numeric.loc[:, numeric.nunique(dropna=True).sort_values(ascending=False).head(MAX_CORR_COLUMNS).index]
     return {
